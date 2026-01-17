@@ -5,18 +5,15 @@ Resume Analyzer is a Django web app that helps job seekers analyze resumes and h
 
 ## How to Clone and Run
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/ArfaMujahid/Resume_Analyzer.git
 cd Resume_Analyzer
 
 python -m venv venv
 venv\Scripts\activate  # Windows
 
 pip install -r requirements.txt
-python manage.py migrate
 python manage.py runserver
 ```
-
-Open http://localhost:8000 and http://localhost:8000/admin for admin access.
 
 ## UI Screenshots
 ![Home](screenshots/1_home.png)
