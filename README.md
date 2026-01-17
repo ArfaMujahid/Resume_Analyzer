@@ -17,9 +17,9 @@ python manage.py runserver
 
 ## UI Screenshots
 ![Home](screenshots/1_home.png)
-![Loading](screenshots/2.5_loading.png)
 ![Home - Alternate](screenshots/2_home.png)
 ![Recruiter - Step 1](screenshots/3_recruiter.png)
+![Loading](screenshots/2.5_loading.png)
 ![Recruiter - Step 2](screenshots/4_recruiter.png)
 ![Recruiter - Step 3](screenshots/5_recruiter.png)
 ![Recruiter - Step 4](screenshots/6_recruiter.png)
