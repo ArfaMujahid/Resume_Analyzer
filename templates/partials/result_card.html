@@ -1,0 +1,340 @@
+{% load static %}
+
+<!-- Reusable Result Card Component -->
+<div class="result-card {% if compact %}compact{% endif %}" data-score="{{ result.overall_score }}">
+    <!-- Header with Score -->
+    <div class="result-card-header">
+        <div class="result-info">
+            <h5 class="result-title">
+                {% if result.resume %}
+                    {{ result.resume.original_filename }}
+                {% else %}
+                    Resume #{{ result.resume_id }}
+                {% endif %}
+            </h5>
+            {% if show_meta and result.resume %}
+                <p class="result-meta text-muted">
+                    {{ result.resume.file_size_bytes|filesizeformat }} •
+                    {{ result.resume.created_at|date:"M d, Y" }}
+                </p>
+            {% endif %}
+        </div>
+        <div class="result-score">
+            <div class="score-circle {% if result.overall_score >= 80 %}score-excellent{% elif result.overall_score >= 60 %}score-good{% elif result.overall_score >= 40 %}score-fair{% else %}score-poor{% endif %}">
+                <span>{{ result.overall_score|floatformat:0 }}%</span>
+            </div>
+            {% if show_confidence %}
+                <small class="confidence-badge confidence-{{ 'high' if result.confidence >= 70 else 'medium' if result.confidence >= 40 else 'low' }}">
+                    {{ result.confidence|floatformat:0 }}% confidence
+                </small>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Score Breakdown -->
+    {% if show_breakdown %}
+    <div class="result-breakdown">
+        <div class="row g-2">
+            <div class="col-6 col-md-3">
+                <div class="breakdown-item">
+                    <div class="breakdown-label">Semantic</div>
+                    <div class="breakdown-value">{{ result.component_scores.semantic_similarity|floatformat:1 }}/40</div>
+                    <div class="progress mt-1" style="height: 4px;">
+                        <div class="progress-bar bg-info" style="width: {{ result.component_scores.semantic_similarity|mul:2.5 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="breakdown-item">
+                    <div class="breakdown-label">Skills</div>
+                    <div class="breakdown-value">{{ result.component_scores.skills_match|floatformat:1 }}/25</div>
+                    <div class="progress mt-1" style="height: 4px;">
+                        <div class="progress-bar bg-success" style="width: {{ result.component_scores.skills_match|mul:4 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="breakdown-item">
+                    <div class="breakdown-label">Experience</div>
+                    <div class="breakdown-value">{{ result.component_scores.experience_seniority|floatformat:1 }}/20</div>
+                    <div class="progress mt-1" style="height: 4px;">
+                        <div class="progress-bar bg-warning" style="width: {{ result.component_scores.experience_seniority|mul:5 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="breakdown-item">
+                    <div class="breakdown-label">Education</div>
+                    <div class="breakdown-value">{{ result.component_scores.education_certs|floatformat:1 }}/10</div>
+                    <div class="progress mt-1" style="height: 4px;">
+                        <div class="progress-bar bg-primary" style="width: {{ result.component_scores.education_certs|mul:10 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Evidence Section -->
+    {% if show_evidence and result.evidence %}
+    <div class="result-evidence">
+        {% if result.evidence.matchedRequirements %}
+            <h6 class="evidence-title">✅ Top Matches</h6>
+            <div class="evidence-list">
+                {% for match in result.evidence.matchedRequirements|slice:":3" %}
+                <div class="evidence-item">
+                    <div class="evidence-requirement">{{ match.jd_text }}</div>
+                    {% for snippet in match.resume_snippets|slice:":1" %}
+                        <div class="evidence-snippet">→ {{ snippet }}</div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if result.evidence.missingRequirements %}
+            <h6 class="evidence-title mt-3">❌ Missing Requirements</h6>
+            <div class="missing-list">
+                {% for req in result.evidence.missingRequirements|slice:":3" %}
+                <div class="missing-item">{{ req }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Recommendations -->
+    {% if show_recommendations and result.recommendations %}
+    <div class="result-recommendations">
+        {% if result.recommendations.talent %}
+            <h6 class="recommendation-title">💡 Recommendations</h6>
+            <div class="recommendation-list">
+                {% for rec in result.recommendations.talent|slice:":2" %}
+                <div class="recommendation-item">{{ rec }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    {% if show_actions %}
+    <div class="result-actions">
+        {% if can_view %}
+            <button class="btn btn-sm btn-outline-primary" onclick="viewResultDetails({{ result.id }})">
+                View Details
+            </button>
+        {% endif %}
+        {% if can_shortlist %}
+            <button class="btn btn-sm btn-outline-success" onclick="shortlistResult({{ result.id }})">
+                Shortlist
+            </button>
+        {% endif %}
+        {% if can_download and result.resume %}
+            <button class="btn btn-sm btn-outline-secondary" onclick="downloadResume({{ result.resume.id }})">
+                Download
+            </button>
+        {% endif %}
+        {% if can_improve %}
+            <a href="{% url 'talent:suggestions' resume_id=result.resume.id %}" class="btn btn-sm btn-outline-warning">
+                Improve Score
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Result Card Styles */
+.result-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #e9ecef;
+}
+
+.result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.result-card.compact {
+    padding: 1rem;
+}
+
+.result-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.result-info {
+    flex: 1;
+}
+
+.result-title {
+    margin: 0;
+    color: #495057;
+    font-size: 1.1rem;
+}
+
+.result-meta {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+}
+
+.result-score {
+    text-align: center;
+    margin-left: 1rem;
+}
+
+.score-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+    position: relative;
+    background: conic-gradient(
+        from 0deg,
+        #2f8f6a 0deg,
+        #c8a24a 90deg,
+        #b5534b 180deg,
+        #b5534b 360deg
+    );
+}
+
+.score-circle::before {
+    content: '';
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: white;
+}
+
+.score-circle span {
+    position: relative;
+    z-index: 1;
+}
+
+.result-card.compact .score-circle {
+    width: 60px;
+    height: 60px;
+    font-size: 1.25rem;
+}
+
+.result-card.compact .score-circle::before {
+    width: 52px;
+    height: 52px;
+}
+
+.confidence-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 10px;
+    margin-top: 0.5rem;
+}
+
+.result-breakdown {
+    margin-bottom: 1rem;
+}
+
+.breakdown-item {
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 5px;
+}
+
+.breakdown-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.breakdown-value {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.result-evidence {
+    margin-bottom: 1rem;
+}
+
+.evidence-title,
+.recommendation-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.evidence-item {
+    background: #f8f9fa;
+    border-left: 3px solid #2f8f6a;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0 3px 3px 0;
+}
+
+.evidence-requirement {
+    font-weight: 500;
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+.evidence-snippet {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+.missing-item {
+    background: #fff5f5;
+    border-left: 3px solid #b5534b;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+    border-radius: 0 3px 3px 0;
+    font-size: 0.875rem;
+    color: #721c24;
+}
+
+.recommendation-item {
+    background: #f0fff4;
+    border-left: 3px solid #2f8f6a;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+    border-radius: 0 3px 3px 0;
+    font-size: 0.875rem;
+    color: #155724;
+}
+
+.result-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Score Colors */
+.score-excellent { background: conic-gradient(from 0deg, #2f8f6a 0deg, #2f8f6a 360deg); }
+.score-good { background: conic-gradient(from 0deg, #2f8f6a 0deg, #2f8f6a 288deg, #c8a24a 288deg, #c8a24a 360deg); }
+.score-fair { background: conic-gradient(from 0deg, #c8a24a 0deg, #c8a24a 216deg, #b5534b 216deg, #b5534b 360deg); }
+.score-poor { background: conic-gradient(from 0deg, #b5534b 0deg, #b5534b 360deg); }
+
+.confidence-high { background: #d4edda; color: #155724; }
+.confidence-medium { background: #fff3cd; color: #856404; }
+.confidence-low { background: #f8d7da; color: #721c24; }
+</style>

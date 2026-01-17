@@ -1,0 +1,512 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Resume Improvement Suggestions - {{ site_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.suggestion-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border-left: 4px solid #1f6b4f;
+}
+
+.suggestion-card.improved {
+    border-left-color: #2f8f6a;
+}
+
+.bullet-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.bullet-item.original {
+    border-left: 3px solid #6c757d;
+}
+
+.bullet-item.improved {
+    border-left: 3px solid #2f8f6a;
+    background: #f0fff4;
+}
+
+.bullet-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+.improvement-note {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.action-buttons {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.copy-btn {
+    background: #1f6b4f;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.copy-btn:hover {
+    background: #15513b;
+}
+
+.copy-btn.copied {
+    background: #2f8f6a;
+}
+
+.section-title {
+    color: #495057;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.skill-gap-item {
+    background: #fff5f5;
+    border-left: 4px solid #b5534b;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0 5px 5px 0;
+}
+
+.skill-suggestion {
+    background: #f0fff4;
+    border-left: 4px solid #2f8f6a;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0 5px 5px 0;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #1f6b4f;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.editor-container {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.editor-textarea {
+    width: 100%;
+    min-height: 400px;
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.editor-textarea:focus {
+    outline: none;
+    border-color: #1f6b4f;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.editor-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'talent:dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'talent:analysis' %}">Analysis</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'talent:analysis_results' %}">Results</a></li>
+            <li class="breadcrumb-item active">Improvement Suggestions</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">Resume Improvement Suggestions</h2>
+            {% if resume and job_description %}
+            <p class="text-muted">
+                Improving: <strong>{{ resume.original_filename }}</strong> for
+                <strong>{{ job_description.title|default:"Job Description" }}</strong>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h4>Generating improvement suggestions...</h4>
+            <p class="text-muted">This may take a few moments. Please don't close this page.</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" style="display: none;">
+        <!-- Interactive Resume Editor -->
+        <div class="editor-container">
+            <h3 class="section-title">📝 Edit Your Resume</h3>
+            <p class="text-muted mb-3">Make changes to your resume content below. Click "Get Suggestions" to see AI-powered improvements.</p>
+
+            <textarea id="resumeEditor" class="editor-textarea" placeholder="Paste your resume content here...">{{ resume_text|default:"" }}</textarea>
+
+            <div class="editor-actions">
+                <button id="clearBtn" class="btn btn-outline-secondary">
+                    <i class="fas fa-trash me-2"></i>Clear
+                </button>
+                <button id="getSuggestionsBtn" class="btn btn-primary">
+                    <i class="fas fa-magic me-2"></i>Get Suggestions
+                </button>
+            </div>
+        </div>
+
+        <!-- Bullet Point Improvements -->
+        <div id="bulletImprovements" style="display: none;">
+            <div class="suggestion-card">
+                <h3 class="section-title">🎯 Improved Bullet Points</h3>
+                <p class="text-muted mb-4">Here are some improved versions of your bullet points, tailored to match the job requirements better.</p>
+
+                <div id="bulletsContainer">
+                    <!-- Bullet improvements will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Skill Gap Analysis -->
+        <div id="skillGapAnalysis" style="display: none;">
+            <div class="suggestion-card">
+                <h3 class="section-title">📊 Skill Gap Analysis</h3>
+                <p class="text-muted mb-4">Identify missing skills and get recommendations on how to address them.</p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="mb-3">❌ Missing Skills</h5>
+                        <div id="missingSkills">
+                            <!-- Missing skills will be inserted here -->
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="mb-3">💡 Skill Development Suggestions</h5>
+                        <div id="skillSuggestions">
+                            <!-- Skill suggestions will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Recommendations -->
+        <div id="contentRecommendations" style="display: none;">
+            <div class="suggestion-card improved">
+                <h3 class="section-title">✨ Content Recommendations</h3>
+                <div id="recommendationsList">
+                    <!-- Recommendations will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <a href="{% url 'talent:analysis_results' %}" class="btn btn-secondary btn-lg mr-2">
+                    ← Back to Results
+                </a>
+                <button id="downloadImprovedBtn" class="btn btn-success btn-lg" style="display: none;">
+                    <i class="fas fa-download me-2"></i>Download Improved Resume
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const resumeEditor = document.getElementById('resumeEditor');
+    const getSuggestionsBtn = document.getElementById('getSuggestionsBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const mainContent = document.getElementById('mainContent');
+    const downloadBtn = document.getElementById('downloadImprovedBtn');
+
+    // Show main content immediately
+    mainContent.style.display = 'block';
+
+    // Get suggestions button click handler
+    getSuggestionsBtn.addEventListener('click', function() {
+        const resumeText = resumeEditor.value.trim();
+
+        if (!resumeText) {
+            showErrorModal('Please enter your resume content first.');
+            return;
+        }
+
+        // Show loading
+        loadingOverlay.style.display = 'flex';
+
+        // Get job description from URL or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobDescriptionId = urlParams.get('job_description_id');
+
+        // Fetch suggestions from API
+        fetch('/talent/api/get-suggestions/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                resume_text: resumeText,
+                job_description_id: jobDescriptionId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadingOverlay.style.display = 'none';
+
+            if (data.success) {
+                displaySuggestions(data);
+            } else {
+                showErrorModal('Error: ' + (data.error || 'Failed to get suggestions'));
+            }
+        })
+        .catch(error => {
+            loadingOverlay.style.display = 'none';
+            console.error('Error:', error);
+            showErrorModal('An error occurred while getting suggestions. Please try again.');
+        });
+    });
+
+    // Clear button handler
+    clearBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear all content?')) {
+            resumeEditor.value = '';
+            hideAllSuggestions();
+        }
+    });
+
+    // Download improved resume
+    downloadBtn.addEventListener('click', function() {
+        const improvedText = compileImprovedResume();
+        downloadText(improvedText, 'improved_resume.txt');
+    });
+});
+
+function displaySuggestions(data) {
+    // Display bullet improvements
+    if (data.bullet_improvements && data.bullet_improvements.length > 0) {
+        displayBulletImprovements(data.bullet_improvements);
+        document.getElementById('bulletImprovements').style.display = 'block';
+    }
+
+    // Display skill gap analysis
+    if (data.skill_gap_analysis) {
+        displaySkillGapAnalysis(data.skill_gap_analysis);
+        document.getElementById('skillGapAnalysis').style.display = 'block';
+    }
+
+    // Display content recommendations
+    if (data.content_recommendations && data.content_recommendations.length > 0) {
+        displayContentRecommendations(data.content_recommendations);
+        document.getElementById('contentRecommendations').style.display = 'block';
+    }
+
+    // Show download button if we have improvements
+    if (data.bullet_improvements || data.content_recommendations) {
+        document.getElementById('downloadImprovedBtn').style.display = 'inline-block';
+    }
+}
+
+function displayBulletImprovements(bullets) {
+    const container = document.getElementById('bulletsContainer');
+    container.innerHTML = '';
+
+    bullets.forEach((item, index) => {
+        const bulletDiv = document.createElement('div');
+        bulletDiv.className = 'mb-4';
+        bulletDiv.innerHTML = `
+            <div class="bullet-item original mb-2">
+                <div class="bullet-text">${escapeHtml(item.original)}</div>
+                <div class="action-buttons">
+                    <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(item.original)}', this)">Copy</button>
+                </div>
+            </div>
+            <div class="bullet-item improved">
+                <div class="bullet-text">${escapeHtml(item.improved)}</div>
+                <div class="improvement-note">${escapeHtml(item.improvement_note)}</div>
+                <div class="action-buttons">
+                    <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(item.improved)}', this)">Copy</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(bulletDiv);
+    });
+}
+
+function displaySkillGapAnalysis(skillGap) {
+    const missingSkillsContainer = document.getElementById('missingSkills');
+    const suggestionsContainer = document.getElementById('skillSuggestions');
+
+    // Display missing skills
+    missingSkillsContainer.innerHTML = '';
+    if (skillGap.missing_skills && skillGap.missing_skills.length > 0) {
+        skillGap.missing_skills.forEach(skill => {
+            const skillDiv = document.createElement('div');
+            skillDiv.className = 'skill-gap-item';
+            skillDiv.textContent = skill;
+            missingSkillsContainer.appendChild(skillDiv);
+        });
+    } else {
+        missingSkillsContainer.innerHTML = '<p class="text-muted">No critical missing skills identified.</p>';
+    }
+
+    // Display skill suggestions
+    suggestionsContainer.innerHTML = '';
+    if (skillGap.suggestions && skillGap.suggestions.length > 0) {
+        skillGap.suggestions.forEach(suggestion => {
+            const suggestionDiv = document.createElement('div');
+            suggestionDiv.className = 'skill-suggestion';
+            suggestionDiv.innerHTML = `<strong>${escapeHtml(suggestion.skill)}:</strong> ${escapeHtml(suggestion.suggestion)}`;
+            suggestionsContainer.appendChild(suggestionDiv);
+        });
+    } else {
+        suggestionsContainer.innerHTML = '<p class="text-muted">No specific skill development suggestions at this time.</p>';
+    }
+}
+
+function displayContentRecommendations(recommendations) {
+    const container = document.getElementById('recommendationsList');
+    container.innerHTML = '';
+
+    recommendations.forEach(rec => {
+        const recDiv = document.createElement('div');
+        recDiv.className = 'recommendation-item mb-3';
+        recDiv.innerHTML = `
+            <h5>${escapeHtml(rec.category)}</h5>
+            <p>${escapeHtml(rec.suggestion)}</p>
+        `;
+        container.appendChild(recDiv);
+    });
+}
+
+function hideAllSuggestions() {
+    document.getElementById('bulletImprovements').style.display = 'none';
+    document.getElementById('skillGapAnalysis').style.display = 'none';
+    document.getElementById('contentRecommendations').style.display = 'none';
+    document.getElementById('downloadImprovedBtn').style.display = 'none';
+}
+
+function compileImprovedResume() {
+    // This would compile all improvements into a single resume text
+    // For now, just return the editor content
+    return document.getElementById('resumeEditor').value;
+}
+
+function copyToClipboard(text, button) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.classList.add('copied');
+
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+function downloadText(text, filename) {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+</script>
+{% endblock %}

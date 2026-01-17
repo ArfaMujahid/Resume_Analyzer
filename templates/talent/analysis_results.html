@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analysis Results - Resume Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+.score-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: white;
+    margin: 0 auto;
+    position: relative;
+    background: conic-gradient(
+        from 0deg,
+        #2f8f6a 0deg,
+        #c8a24a 90deg,
+        #b5534b 180deg,
+        #b5534b 360deg
+    );
+}
+
+.score-circle::before {
+    content: '';
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: white;
+}
+
+.score-circle span {
+    position: relative;
+    z-index: 1;
+}
+
+.score-excellent { background: conic-gradient(from 0deg, #2f8f6a 0deg, #2f8f6a 360deg); }
+.score-good { background: conic-gradient(from 0deg, #2f8f6a 0deg, #2f8f6a 288deg, #c8a24a 288deg, #c8a24a 360deg); }
+.score-fair { background: conic-gradient(from 0deg, #c8a24a 0deg, #c8a24a 216deg, #b5534b 216deg, #b5534b 360deg); }
+.score-poor { background: conic-gradient(from 0deg, #b5534b 0deg, #b5534b 360deg); }
+
+.component-score {
+    margin-bottom: 1rem;
+}
+
+.component-score .progress {
+    height: 25px;
+}
+
+.evidence-item {
+    background: #f8f9fa;
+    border-left: 4px solid #1f6b4f;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0 5px 5px 0;
+}
+
+.evidence-item .jd-text {
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.evidence-item .resume-snippet {
+    font-style: italic;
+    color: #6c757d;
+    margin-left: 1rem;
+}
+
+.missing-item {
+    background: #fff5f5;
+    border-left: 4px solid #b5534b;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0 5px 5px 0;
+}
+
+.recommendation-item {
+    background: #f0fff4;
+    border-left: 4px solid #2f8f6a;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0 5px 5px 0;
+}
+
+.analysis-section {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.analysis-section h3 {
+    color: #495057;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.confidence-badge {
+    font-size: 0.9rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+}
+
+.confidence-high { background: #d4edda; color: #155724; }
+.confidence-medium { background: #fff3cd; color: #856404; }
+.confidence-low { background: #f8d7da; color: #721c24; }
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #1f6b4f;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'talent:dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'talent:analysis' %}">Analysis</a></li>
+            <li class="breadcrumb-item active">Results</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">Resume Analysis Results</h2>
+            {% if resume and job_description %}
+            <p class="text-muted">
+                Analyzing: <strong>{{ resume.original_filename }}</strong> against
+                <strong>{{ job_description.title|default:"Job Description" }}</strong>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h4>Analyzing your resume...</h4>
+            <p class="text-muted">This may take a few moments. Please don't close this page.</p>
+        </div>
+    </div>
+
+    <!-- Analysis Results -->
+    {% if analysis_complete and match_result %}
+    <!-- Overall Score -->
+    <div class="analysis-section text-center">
+        <h3>Overall Match Score</h3>
+        <div class="score-circle {% if match_result.overall_score >= 80 %}score-excellent{% elif match_result.overall_score >= 60 %}score-good{% elif match_result.overall_score >= 40 %}score-fair{% else %}score-poor{% endif %}">
+            <span>{{ match_result.overall_score|floatformat:0 }}%</span>
+        </div>
+        <p class="mt-3">
+            <span class="confidence-badge confidence-{{ 'high' if match_result.confidence >= 70 else 'medium' if match_result.confidence >= 40 else 'low' }}">
+                {{ match_result.confidence|floatformat:0 }}% Confidence
+            </span>
+        </p>
+    </div>
+
+    <!-- Component Scores -->
+    <div class="analysis-section">
+        <h3>Score Breakdown</h3>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="component-score">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Semantic Similarity</span>
+                        <span>{{ match_result.component_scores.semantic_similarity|floatformat:1 }}/40</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-info" style="width: {{ match_result.component_scores.semantic_similarity|mul:2.5 }}%"></div>
+                    </div>
+                </div>
+                <div class="component-score">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Skills Match</span>
+                        <span>{{ match_result.component_scores.skills_match|floatformat:1 }}/25</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" style="width: {{ match_result.component_scores.skills_match|mul:4 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="component-score">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Experience Seniority</span>
+                        <span>{{ match_result.component_scores.experience_seniority|floatformat:1 }}/20</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" style="width: {{ match_result.component_scores.experience_seniority|mul:5 }}%"></div>
+                    </div>
+                </div>
+                <div class="component-score">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Education & Certifications</span>
+                        <span>{{ match_result.component_scores.education_certs|floatformat:1 }}/10</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-primary" style="width: {{ match_result.component_scores.education_certs|mul:10 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Matched Requirements -->
+    {% if match_result.evidence.matchedRequirements %}
+    <div class="analysis-section">
+        <h3>✅ Matched Requirements</h3>
+        {% for req in match_result.evidence.matchedRequirements %}
+        <div class="evidence-item">
+            <div class="jd-text">{{ req.jd_text }}</div>
+            {% for snippet in req.resume_snippets %}
+            <div class="resume-snippet">→ {{ snippet }}</div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Missing Requirements -->
+    {% if match_result.evidence.missingRequirements %}
+    <div class="analysis-section">
+        <h3>❌ Missing Requirements</h3>
+        {% for req in match_result.evidence.missingRequirements %}
+        <div class="missing-item">
+            {{ req }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Concerns -->
+    {% if match_result.evidence.concerns %}
+    <div class="analysis-section">
+        <h3>⚠️ Areas of Concern</h3>
+        {% for concern in match_result.evidence.concerns %}
+        <div class="missing-item">
+            {{ concern }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Recommendations -->
+    {% if match_result.recommendations.talent %}
+    <div class="analysis-section">
+        <h3>💡 Recommendations to Improve Your Score</h3>
+        {% for rec in match_result.recommendations.talent %}
+        <div class="recommendation-item">
+            {{ rec }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{% url 'talent:analysis' %}" class="btn btn-secondary btn-lg mr-2">
+                ← Back to Analysis
+            </a>
+            {% if resume.id and job_description.id %}
+            <a href="{% url 'talent:suggestions' resume_id=resume.id %}?job_description_id={{ job_description.id }}"
+               class="btn btn-primary btn-lg">
+                Get Improvement Suggestions →
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No Results Yet -->
+    <div class="analysis-section text-center">
+        <h3>Analysis Not Complete</h3>
+        <p class="text-muted">The analysis is still running or hasn't been started yet.</p>
+        <a href="{% url 'talent:analysis' %}" class="btn btn-primary">
+            Start Analysis
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Check analysis status periodically
+function checkAnalysisStatus() {
+    const resumeId = '{{ request.GET.resume_id }}';
+    const jobDescriptionId = '{{ request.GET.job_description_id }}';
+
+    if (!resumeId || !jobDescriptionId) return;
+
+    fetch(`${window.location.pathname}?resume_id=${resumeId}&job_description_id=${jobDescriptionId}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'complete') {
+            // Hide loading overlay
+            document.getElementById('loadingOverlay').style.display = 'none';
+            // Enable page interaction
+            document.body.style.pointerEvents = 'auto';
+            document.body.style.overflow = 'auto';
+            // Reload the page to show results
+            window.location.reload();
+        } else if (data.status === 'failed') {
+            // Hide loading and show error
+            document.getElementById('loadingOverlay').style.display = 'none';
+            // Enable page interaction
+            document.body.style.pointerEvents = 'auto';
+            document.body.style.overflow = 'auto';
+            showErrorModal('Analysis failed. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error checking status:', error);
+    });
+}
+
+// Show loading overlay if analysis is running
+{% if not analysis_complete %}
+document.addEventListener('DOMContentLoaded', function() {
+    // Show loading overlay
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    // Disable page interaction
+    document.body.style.pointerEvents = 'none';
+    document.body.style.overflow = 'hidden';
+
+    // Check status every 3 seconds
+    setInterval(checkAnalysisStatus, 3000);
+});
+{% endif %}
+</script>
+{% endblock %}

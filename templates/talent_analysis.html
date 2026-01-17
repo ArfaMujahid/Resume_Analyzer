@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Run Analysis{% endblock %}
+
+{% block body_class %}page-analysis{% endblock %}
+
+{% block content %}
+  <section class="page-header fade-up">
+    <div>
+      <span class="tag">Talent analysis</span>
+      <h1>Run a targeted fit analysis.</h1>
+      <p>Upload a resume and paste a job description to see evidence-backed results.</p>
+    </div>
+    <button class="btn btn-primary">Start processing</button>
+  </section>
+
+  <div class="stepper fade-up delay-1">
+    {% for step in steps %}
+      <div class="step step-{{ step.status }}">
+        <span class="step-dot"></span>
+        <span>{{ step.label }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <section class="grid two-col fade-up delay-2">
+    <article class="card">
+      <h3>Resume file</h3>
+      <p>Keep resumes under 20MB. We never send raw documents to AI.</p>
+      <div class="dropzone">
+        <span>Drop a resume here</span>
+        <button class="btn btn-ghost">Browse files</button>
+      </div>
+      <div class="file-row">
+        <div>
+          <strong>Amina-Khan-Resume.pdf</strong>
+          <p class="muted">Parsed successfully • 6 sections detected</p>
+        </div>
+        <span class="pill success">Ready</span>
+      </div>
+    </article>
+    <article class="card">
+      <h3>Job description</h3>
+      <p>Paste a JD to extract required and preferred requirements.</p>
+      <textarea class="input-textarea" rows="9" placeholder="Paste job description text..."></textarea>
+      <div class="card-actions">
+        <button class="btn btn-ghost">Upload JD</button>
+        <button class="btn btn-primary">Extract requirements</button>
+      </div>
+    </article>
+  </section>
+
+  <section class="section fade-up delay-3">
+    <div class="section-heading">
+      <h2>Extracted requirements (preview)</h2>
+      <p>Review and edit before running a full analysis.</p>
+    </div>
+    <div class="grid two-col">
+      <article class="card">
+        <h3>Required</h3>
+        <ul class="bullets">
+          <li>Lead moderated usability sessions with stakeholders.</li>
+          <li>Translate insights into prioritized product changes.</li>
+          <li>Collaborate with design and engineering partners.</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h3>Preferred</h3>
+        <ul class="bullets">
+          <li>Experience in regulated healthcare environments.</li>
+          <li>Strong quantitative research background.</li>
+          <li>Tooling: Dovetail, Amplitude, Looker.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+{% endblock %}

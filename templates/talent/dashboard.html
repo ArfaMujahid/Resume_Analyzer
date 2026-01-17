@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Talent Dashboard - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Welcome Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="text-center">
+                <h1 class="h3 mb-3">Resume Analyzer</h1>
+                <p class="text-muted mb-4">Analyze your resume against job descriptions using AI</p>
+                <a href="{% url 'talent:analysis' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus-circle me-2"></i>Start Analysis
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-robot fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="card-title">AI-Powered Analysis</h5>
+                    <p class="card-text">Get detailed insights on how well your resume matches job requirements</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-chart-line fa-3x text-success"></i>
+                    </div>
+                    <h5 class="card-title">Match Scoring</h5>
+                    <p class="card-text">Receive a comprehensive score with breakdown of skills, experience, and more</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-lightbulb fa-3x text-warning"></i>
+                    </div>
+                    <h5 class="card-title">Recommendations</h5>
+                    <p class="card-text">Get personalized suggestions to improve your resume and job prospects</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title text-center mb-4">How It Works</h5>
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-4">
+                            <div class="step-number">1</div>
+                            <h6>Paste Your Resume</h6>
+                            <p class="text-muted small">Copy and paste your resume text</p>
+                        </div>
+                        <div class="col-md-3 text-center mb-4">
+                            <div class="step-number">2</div>
+                            <h6>Add Job Description</h6>
+                            <p class="text-muted small">Paste the job description you're interested in</p>
+                        </div>
+                        <div class="col-md-3 text-center mb-4">
+                            <div class="step-number">3</div>
+                            <h6>Get Analysis</h6>
+                            <p class="text-muted small">AI analyzes and scores your match</p>
+                        </div>
+                        <div class="col-md-3 text-center mb-4">
+                            <div class="step-number">4</div>
+                            <h6>Improve</h6>
+                            <p class="text-muted small">Receive recommendations to enhance your resume</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.feature-icon {
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #1f6b4f;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin: 0 auto 1rem;
+}
+</style>
+{% endblock %}

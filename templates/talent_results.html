@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Results{% endblock %}
+
+{% block body_class %}page-results{% endblock %}
+
+{% block content %}
+  <section class="page-header fade-up">
+    <div>
+      <span class="tag">Results</span>
+      <h1>Fit score with evidence.</h1>
+      <p>Matches are grounded in snippets and structured requirements.</p>
+    </div>
+    <div class="score-ring" style="--score: {{ score }};">
+      <div class="score-ring-inner">
+        <span class="score">{{ score }}</span>
+        <span class="score-label">Overall fit</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section fade-up delay-1">
+    <div class="section-heading">
+      <h2>Score breakdown</h2>
+      <p>Weighted signals combined with quality adjustments.</p>
+    </div>
+    <div class="card">
+      {% for item in component_scores %}
+        <div class="bar-row">
+          <div class="bar-header">
+            <span>{{ item.label }}</span>
+            <span>{{ item.score }}/{{ item.max }}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: {{ item.percent }}%;"></div>
+          </div>
+        </div>
+      {% endfor %}
+      <div class="confidence">
+        <span class="pill">Confidence</span>
+        <strong>{{ confidence }}%</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="section fade-up delay-2">
+    <div class="section-heading">
+      <h2>Top matches</h2>
+      <p>Each requirement is linked to resume evidence.</p>
+    </div>
+    <div class="card-grid">
+      {% for match in matches %}
+        <article class="card">
+          <h3>{{ match.jd }}</h3>
+          <span class="pill">Similarity {{ match.score|floatformat:2 }}</span>
+          <ul class="bullets">
+            {% for snippet in match.evidence %}
+              <li>{{ snippet }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section split fade-up delay-3">
+    <article class="card">
+      <h3>Missing or weak requirements</h3>
+      <ul class="bullets">
+        {% for item in missing %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </article>
+    <article class="card">
+      <h3>Suggestions to improve match</h3>
+      <ul class="bullets">
+        {% for item in recommendations %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      <p class="muted">
+        Only include skills or experience you truly have.
+      </p>
+    </article>
+  </section>
+{% endblock %}

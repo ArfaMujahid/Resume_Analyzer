@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Resume Analyzer{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="hero-copy fade-up">
+      <span class="tag">Explainable matching for talent and recruiting teams</span>
+      <h1>Make resume-to-role fit precise, transparent, and fast.</h1>
+      <p class="lead">
+        Upload a resume and job description to get a fit score, evidence-backed
+        matches, and grounded suggestions. For recruiters, rank batches with
+        confidence and exportable insights.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-accent btn-hero" href="{% url 'core:talent_dashboard' %}">Talent workspace</a>
+        <a class="btn btn-mint btn-hero" href="{% url 'core:recruiter_dashboard' %}">Recruiter workspace</a>
+      </div>
+      <div class="hero-metrics">
+        <div class="metric">
+          <span class="metric-value">4x</span>
+          <span class="metric-label">Faster screening</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">92%</span>
+          <span class="metric-label">Explainability coverage</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Full resumes sent to LLMs</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-panel fade-up delay-1">
+      <div class="panel-card">
+        <h3>How it works</h3>
+        <ol class="pipeline">
+          <li>
+            <span class="pipeline-step">1</span>
+            <div>
+              <strong>Extract</strong>
+              <p>Parse resumes and JDs into structured, normalized sections.</p>
+            </div>
+          </li>
+          <li>
+            <span class="pipeline-step">2</span>
+            <div>
+              <strong>Retrieve</strong>
+              <p>Chunk, embed, and pull top evidence per requirement.</p>
+            </div>
+          </li>
+          <li>
+            <span class="pipeline-step">3</span>
+            <div>
+              <strong>Score</strong>
+              <p>Blend semantic, skills, and experience signals with penalties.</p>
+            </div>
+          </li>
+          <li>
+            <span class="pipeline-step">4</span>
+            <div>
+              <strong>Explain</strong>
+              <p>Deliver traceable matches, gaps, and improvement ideas.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="section fade-up delay-2">
+    <div class="section-heading">
+      <h2>Built for clarity, not guesswork</h2>
+      <p>Every score comes with evidence, confidence, and a reason to trust it.</p>
+    </div>
+    <div class="card-grid">
+      {% for item in highlights %}
+        <article class="card">
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.detail }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section split fade-up delay-3">
+    <div class="card mode-card">
+      <h3>Talent mode</h3>
+      <p>Track resumes, run targeted analyses, and improve your match score.</p>
+      <ul class="bullets">
+        <li>Upload, parse, and manage multiple resumes.</li>
+        <li>See evidence-backed matches and missing requirements.</li>
+        <li>Generate grounded rewrite suggestions.</li>
+      </ul>
+      <a class="btn btn-accent btn-mode" href="{% url 'core:talent_dashboard' %}">Open talent dashboard</a>
+    </div>
+    <div class="card mode-card mode-card--mint">
+      <h3>Recruiter mode</h3>
+      <p>Batch uploads, ranked candidates, and fast export workflows.</p>
+      <ul class="bullets">
+        <li>Create batches with TTL-based storage.</li>
+        <li>Rank and filter by score, skills, and evidence.</li>
+        <li>Export shortlists in CSV.</li>
+      </ul>
+      <a class="btn btn-mint btn-mode" href="{% url 'core:recruiter_dashboard' %}">Open recruiter workspace</a>
+    </div>
+  </section>
+{% endblock %}

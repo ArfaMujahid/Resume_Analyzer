@@ -1,0 +1,754 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Recruiter Dashboard - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Welcome Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Welcome back!</h1>
+                    <p class="text-muted mb-0">Manage your resume batches and find the best candidates</p>
+                </div>
+                <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="fas fa-plus-circle me-2"></i>Create Batch
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resume Upload and Analysis Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Resume Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Upload Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="resumeFiles" class="form-label">Upload Resumes</label>
+                                <input type="file" class="form-control" id="resumeFiles" multiple accept=".pdf,.docx,.txt">
+                                <div class="form-text">Upload multiple resumes (PDF, DOCX, TXT)</div>
+                            </div>
+                            <button class="btn btn-primary" onclick="uploadResumes()">
+                                <i class="fas fa-upload me-2"></i>Upload
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="jobDescription" class="form-label">Job Description</label>
+                                <textarea class="form-control" id="jobDescription" rows="6" placeholder="Paste the job description here..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Uploaded Resumes List -->
+                    <div id="uploadedResumes" class="mb-4" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="fas fa-file-alt me-2"></i>Uploaded Resumes
+                                <span class="badge bg-primary ms-2" id="resumeCountBadge">0</span>
+                            </h6>
+                            <small class="text-muted">Text extracted and ready for analysis</small>
+                        </div>
+                        <div id="resumesList"></div>
+                    </div>
+
+                    <!-- Analyze Button -->
+                    <div class="text-center">
+                        <button class="btn btn-success btn-lg" onclick="analyzeMatch()" id="analyzeMatchBtn" disabled>
+                            <i class="fas fa-search me-2"></i>Analyze Match
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Batches -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Recent Batches</h5>
+                    <a href="{% url 'recruiter:batches' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if recent_batches %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Batch ID</th>
+                                        <th>Role</th>
+                                        <th>Resumes</th>
+                                        <th>Status</th>
+                                        <th>TTL</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for batch in recent_batches %}
+                                        <tr>
+                                            <td>
+                                                <code>{{ batch.id|slice:"8" }}</code>
+                                            </td>
+                                            <td>
+                                                {{ batch.job_title|default:"<em class='text-muted'>Not set</em>"|safe }}
+                                            </td>
+                                            <td>{{ batch.resume_count }}</td>
+                                            <td>
+                                                <span class="status-badge status-{{ batch.status }}">
+                                                    {{ batch.status|title }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if batch.expired %}
+                                                    <span class="text-danger">Expired</span>
+                                                {% else %}
+                                                    <span class="text-muted">{{ batch.expires_at|timeuntil }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'recruiter:batch_detail' pk=batch.id %}"
+                                                       class="btn btn-outline-primary">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if batch.status == 'ready' %}
+                                                        <a href="{% url 'recruiter:batch_export' pk=batch.id %}"
+                                                           class="btn btn-outline-success">
+                                                            <i class="fas fa-download"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-layer-group"></i>
+                            <h5>No batches yet</h5>
+                            <p class="text-muted">Create your first batch to start ranking candidates</p>
+                            <a href="{% url 'recruiter:batch_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Create Batch
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Dashboard -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Analytics Overview</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary active" onclick="showAnalytics('7d')">7 Days</button>
+                        <button class="btn btn-outline-primary" onclick="showAnalytics('30d')">30 Days</button>
+                        <button class="btn btn-outline-primary" onclick="showAnalytics('all')">All Time</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Score Distribution Chart -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Score Distribution</h6>
+                            <canvas id="scoreDistributionChart" width="400" height="300"></canvas>
+                        </div>
+                        <!-- Processing Trend -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Processing Trend</h6>
+                            <canvas id="processingTrendChart" width="400" height="300"></canvas>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <!-- Top Skills -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Most In-Demand Skills</h6>
+                            <div id="topSkillsList">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        <!-- Performance Metrics -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Performance Metrics</h6>
+                            <div id="performanceMetrics">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Quick Actions</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="{% url 'recruiter:batch_create' %}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-plus me-2"></i>Create New Batch
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'jobs:create' %}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-briefcase me-2"></i>Add Job Description
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'recruiter:batches' %}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-list me-2"></i>View All Batches
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'users:profile_edit' %}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-user me-2"></i>Edit Profile
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information Card -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card bg-light border-info">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-info-circle fa-2x text-info me-3"></i>
+                        <div>
+                            <h6 class="card-title mb-1">Data Retention Policy</h6>
+                            <p class="card-text small text-muted mb-0">
+                                All recruiter data including resumes and analysis results are automatically deleted after 30 days
+                                to ensure privacy and compliance. You can manually delete batches at any time.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+<div id="resultsSection" class="row" style="display: none;">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Analysis Results</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearResults()">Clear Results</button>
+            </div>
+            <div class="card-body">
+                <div id="resultsContainer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js for data visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Store uploaded resumes data
+let uploadedResumes = [];
+let analysisResults = [];
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // No initialization needed for mock session
+});
+
+function uploadResumes() {
+    const fileInput = document.getElementById('resumeFiles');
+    const files = fileInput.files;
+
+    if (files.length === 0) {
+        showErrorModal('Please select at least one file');
+        return;
+    }
+
+    const formData = new FormData();
+    for (let file of files) {
+        formData.append('files', file);
+    }
+
+    // Show loading overlay
+    showLoadingOverlay('Uploading and extracting text from resumes...');
+
+    fetch('/recruiter/api/upload/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Store uploaded resumes with extracted text
+            uploadedResumes = data.resumes || [];
+            displayUploadedResumes();
+            // Enable analyze button if we have resumes
+            if (uploadedResumes.length > 0) {
+                document.getElementById('analyzeMatchBtn').disabled = false;
+            }
+            hideLoadingOverlay();
+        } else {
+            hideLoadingOverlay();
+            showErrorModal(data.error || 'Upload failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error uploading:', error);
+        hideLoadingOverlay();
+        showErrorModal('Upload failed: ' + error.message);
+    })
+    .finally(() => {
+        // Reset file input
+        fileInput.value = '';
+    });
+}
+
+function displayUploadedResumes() {
+    const container = document.getElementById('uploadedResumes');
+    const listContainer = document.getElementById('resumesList');
+    const countBadge = document.getElementById('resumeCountBadge');
+
+    if (uploadedResumes.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    listContainer.innerHTML = '';
+    countBadge.textContent = uploadedResumes.length;
+
+    uploadedResumes.forEach((resume, index) => {
+        const resumeCol = document.createElement('div');
+        resumeCol.className = 'col-12 mb-3';
+
+        const statusClass = resume.text ? 'success' : 'warning';
+        const statusText = resume.text ? 'Text Extracted' : 'Processing...';
+
+        resumeCol.innerHTML = `
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-file-alt me-2"></i>${resume.filename}
+                    </h6>
+                    <span class="badge bg-${statusClass}">${statusText}</span>
+                </div>
+                <div class="card-body">
+                    ${resume.text ? `
+                        <div class="mb-3">
+                            <h6 class="text-muted small mb-2">Extracted Text:</h6>
+                            <div class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
+                                <pre class="mb-0 small text-wrap">${resume.text}</pre>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewFullResumeText(${index})">
+                                <i class="fas fa-expand me-1"></i>Expand
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyResumeText(${index})">
+                                <i class="fas fa-copy me-1"></i>Copy Text
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                            <span class="text-muted">Extracting text...</span>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+        listContainer.appendChild(resumeCol);
+    });
+}
+
+function viewFullResumeText(index) {
+    const resume = uploadedResumes[index];
+    if (resume.text) {
+        // Find the resume's text container
+        const resumeCard = document.querySelectorAll('#resumesList .col-12')[index];
+        const textContainer = resumeCard.querySelector('.bg-light');
+
+        if (textContainer.style.maxHeight === '300px') {
+            // Expand
+            textContainer.style.maxHeight = 'none';
+            event.target.innerHTML = '<i class="fas fa-compress me-1"></i>Collapse';
+        } else {
+            // Collapse
+            textContainer.style.maxHeight = '300px';
+            event.target.innerHTML = '<i class="fas fa-expand me-1"></i>Expand';
+        }
+    }
+}
+
+function copyResumeText(index) {
+    const resume = uploadedResumes[index];
+    if (resume.text) {
+        navigator.clipboard.writeText(resume.text).then(() => {
+            alert('Resume text copied to clipboard!');
+        }).catch(() => {
+            alert('Failed to copy text');
+        });
+    }
+}
+
+function analyzeMatch() {
+    const jd = document.getElementById('jobDescription').value.trim();
+
+    if (!jd) {
+        showErrorModal('Please provide a job description');
+        return;
+    }
+
+    if (uploadedResumes.length === 0) {
+        showErrorModal('Please upload resumes first');
+        return;
+    }
+
+    // Disable page interaction during analysis
+    document.body.style.pointerEvents = 'none';
+    document.body.style.overflow = 'hidden';
+
+    // Show loading overlay
+    showLoadingOverlay('Analyzing resumes against job description...');
+
+    // Prepare data for analysis
+    const analysisData = {
+        job_description: jd,
+        resumes: uploadedResumes.map(r => ({
+            id: r.id,
+            filename: r.filename,
+            text: r.text
+        }))
+    };
+
+    fetch('/recruiter/api/analyze/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(analysisData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            analysisResults = data.results;
+            displayResults();
+            hideLoadingOverlay();
+        } else {
+            hideLoadingOverlay();
+            showErrorModal(data.error || 'Analysis failed');
+        }
+    })
+    .catch(error => {
+        console.error('Error analyzing:', error);
+        hideLoadingOverlay();
+        showErrorModal('Analysis failed: ' + error.message);
+    })
+    .finally(() => {
+        // Re-enable page interaction
+        document.body.style.pointerEvents = 'auto';
+        document.body.style.overflow = 'auto';
+    });
+}
+
+function displayResults() {
+    const container = document.getElementById('resultsSection');
+    const resultsContainer = document.getElementById('resultsContainer');
+
+    container.style.display = 'block';
+    resultsContainer.innerHTML = '';
+
+    // Sort results by score (descending)
+    const sortedResults = analysisResults.sort((a, b) =>
+        (b.analysis.overall_score || 0) - (a.analysis.overall_score || 0)
+    );
+
+    sortedResults.forEach((result, index) => {
+        const analysis = result.analysis;
+        const score = analysis.overall_score || 0;
+        const scoreClass = score >= 80 ? 'success' : score >= 60 ? 'warning' : 'danger';
+
+        const resultCard = document.createElement('div');
+        resultCard.className = 'card mb-3';
+        resultCard.innerHTML = `
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${index + 1}. ${result.filename}</h6>
+                <span class="badge bg-${scoreClass} fs-6">${score}% Match</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6>Analysis Summary</h6>
+                        <p>${analysis.summary || 'No summary available'}</p>
+
+                        ${analysis.strengths ? `
+                            <h6>Strengths</h6>
+                            <ul>${analysis.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
+                        ` : ''}
+
+                        ${analysis.weaknesses ? `
+                            <h6>Areas for Improvement</h6>
+                            <ul>${analysis.weaknesses.map(w => `<li>${w}</li>`).join('')}</ul>
+                        ` : ''}
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Score Breakdown</h6>
+                        ${analysis.component_scores ? `
+                            <div class="mb-2">
+                                <small>Skills Match</small>
+                                <div class="progress">
+                                    <div class="progress-bar" style="width: ${analysis.component_scores.skills_match || 0}%">
+                                        ${analysis.component_scores.skills_match || 0}%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <small>Experience</small>
+                                <div class="progress">
+                                    <div class="progress-bar bg-info" style="width: ${analysis.component_scores.experience_seniority || 0}%">
+                                        ${analysis.component_scores.experience_seniority || 0}%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <small>Education</small>
+                                <div class="progress">
+                                    <div class="progress-bar bg-warning" style="width: ${analysis.component_scores.education_certs || 0}%">
+                                        ${analysis.component_scores.education_certs || 0}%
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        <div class="mt-3">
+                            <small class="text-muted">Confidence: ${analysis.confidence || 0}%</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        resultsContainer.appendChild(resultCard);
+    });
+
+    // Scroll to results
+    container.scrollIntoView({ behavior: 'smooth' });
+}
+
+function clearResults() {
+    if (!confirm('Are you sure you want to clear all results?')) {
+        return;
+    }
+
+    analysisResults = [];
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('resultsContainer').innerHTML = '';
+}
+
+// Error Modal Functions
+function showErrorModal(message) {
+    const modalBody = document.getElementById('appErrorModalBody');
+    if (modalBody) {
+        modalBody.textContent = message;
+        const modal = new bootstrap.Modal(document.getElementById('appErrorModal'));
+        modal.show();
+    }
+}
+
+// Loading Overlay Functions
+function showLoadingOverlay(message = 'Processing...') {
+    // Create loading overlay if it doesn't exist
+    let overlay = document.getElementById('loadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <h4 id="loadingMessage">${message}</h4>
+                <p class="text-muted">Please wait...</p>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    } else {
+        document.getElementById('loadingMessage').textContent = message;
+    }
+
+    overlay.style.display = 'flex';
+    document.body.classList.add('is-loading');
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+    document.body.classList.remove('is-loading');
+}
+
+// Update loading message
+function updateLoadingMessage(message) {
+    const messageElement = document.getElementById('loadingMessage');
+    if (messageElement) {
+        messageElement.textContent = message;
+    }
+}
+
+function updatePerformanceMetrics(metrics) {
+    const container = document.getElementById('performanceMetrics');
+    container.innerHTML = '';
+
+    const metricsList = metrics || [
+        { label: 'Average Match Score', value: '68%', trend: 'up' },
+        { label: 'Processing Time', value: '2.3 min', trend: 'down' },
+        { label: 'Shortlist Rate', value: '24%', trend: 'up' },
+        { label: 'Completion Rate', value: '96%', trend: 'stable' }
+    ];
+
+    metricsList.forEach(metric => {
+        const metricDiv = document.createElement('div');
+        metricDiv.className = 'd-flex justify-content-between align-items-center mb-2';
+
+        let trendIcon = '';
+        if (metric.trend === 'up') {
+            trendIcon = '<i class="fas fa-arrow-up text-success"></i>';
+        } else if (metric.trend === 'down') {
+            trendIcon = '<i class="fas fa-arrow-down text-danger"></i>';
+        } else {
+            trendIcon = '<i class="fas fa-minus text-muted"></i>';
+        }
+
+        metricDiv.innerHTML = `
+            <span>${metric.label}</span>
+            <span>${metric.value} ${trendIcon}</span>
+        `;
+        container.appendChild(metricDiv);
+    });
+}
+
+function showAnalytics(period) {
+    // Update button states
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // Load data for selected period
+    loadAnalyticsData(period);
+}
+
+function generateDateLabels(days) {
+    const labels = [];
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+    return labels;
+}
+
+function showMockAnalytics(period) {
+    const mockData = {
+        score_distribution: [5, 12, 25, 18, 8],
+        processing_trend: {
+            labels: generateDateLabels(period === '7d' ? 7 : 30),
+            data: period === '7d' ? [12, 19, 15, 25, 22, 30, 28] : [45, 52, 48, 65, 58, 72, 68, 75, 82, 78, 85, 88, 92, 95, 98, 102, 108, 105, 112, 118, 122, 125, 128, 132, 135, 138, 142, 145, 148, 152]
+        },
+        top_skills: [
+            { skill: 'Python', count: 45 },
+            { skill: 'JavaScript', count: 38 },
+            { skill: 'React', count: 32 },
+            { skill: 'AWS', count: 28 },
+            { skill: 'Docker', count: 22 }
+        ],
+        performance_metrics: [
+            { label: 'Average Match Score', value: '68%', trend: 'up' },
+            { label: 'Processing Time', value: '2.3 min', trend: 'down' },
+            { label: 'Shortlist Rate', value: '24%', trend: 'up' },
+            { label: 'Completion Rate', value: '96%', trend: 'stable' }
+        ]
+    };
+
+    updateAnalyticsDisplay(mockData);
+}
+</script>
+
+<style>
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* Loading Overlay Styles */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+.loading-content {
+    text-align: center;
+    max-width: 500px;
+    padding: 2rem;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #1f6b4f;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+body.is-loading {
+    overflow: hidden;
+}
+
+body.is-loading .site-header,
+body.is-loading .site-main,
+body.is-loading .site-footer {
+    pointer-events: none;
+}
+</style>
+
+{% endblock %}

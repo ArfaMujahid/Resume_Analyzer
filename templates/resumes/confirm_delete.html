@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delete Resume - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                        <h2 class="card-title">Delete Resume?</h2>
+                    </div>
+
+                    <p class="text-center mb-4">
+                        Are you sure you want to delete "<strong>{{ resume.original_filename }}</strong>"?
+                    </p>
+
+                    <p class="text-center text-muted small mb-4">
+                        This action cannot be undone. All parsed data and analysis results will be permanently deleted.
+                    </p>
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash me-2"></i>Yes, Delete Resume
+                            </button>
+                            <a href="{% url 'resumes:detail' pk=resume.id %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

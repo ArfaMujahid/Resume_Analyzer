@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}Recruiter Dashboard{% endblock %}
+
+{% block body_class %}page-dashboard{% endblock %}
+
+{% block content %}
+  <section class="page-header fade-up">
+    <div>
+      <span class="tag">Recruiter workspace</span>
+      <h1>Batch rankings at a glance.</h1>
+      <p>Create batches, set TTL policies, and move fast with ranked results.</p>
+    </div>
+    <div class="header-actions"></div>
+  </section>
+
+  <section class="grid two-col fade-up delay-1 recruiter-upload-grid">
+    <article class="card">
+      <h3>Upload resumes</h3>
+      <p>PDF, DOCX, or TXT. We extract text and structure automatically.</p>
+      <div class="dropzone dropzone--square" id="recruiterDropzone">
+        <input type="file" id="recruiterFileInput" accept=".pdf,.docx,.txt" multiple style="display: none;">
+        <span id="recruiterDropzoneText">Drop files here or click to browse</span>
+        <button class="btn btn-ghost" type="button" id="recruiterSelectBtn">Select file</button>
+      </div>
+      <div id="recruiterUploadList" style="margin-top: 1rem; display: none;">
+        <div class="alert alert-success">
+          <strong>Selected files</strong>
+        </div>
+        <ul id="recruiterFileList" class="bullets file-list" style="margin-top: 0.75rem;"></ul>
+      </div>
+    </article>
+    <article class="card">
+      <h3>Job description</h3>
+      <p>Paste the job description you want to analyze against</p>
+      <textarea id="recruiterJobDescriptionText" class="input-textarea" rows="8" placeholder="Paste job description text..."></textarea>
+      <button class="btn btn-mint" type="button" id="recruiterAnalyzeBtn" style="margin-top: 1rem;">Analyze Match</button>
+    </article>
+  </section>
+
+  <section class="section fade-up delay-2" id="recruiterAnalysisResults" style="display: none;">
+    <div class="section-heading">
+      <h2>Analysis Results</h2>
+      <p>Review per-resume scores, gaps, and recommendations.</p>
+    </div>
+    <div id="recruiterResultsContainer" class="results-grid"></div>
+  </section>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <h4>Analyzing resumes...</h4>
+      <p class="text-muted">This may take a few moments. Please wait.</p>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const dropzone = document.getElementById('recruiterDropzone');
+    const fileInput = document.getElementById('recruiterFileInput');
+    const selectBtn = document.getElementById('recruiterSelectBtn');
+    const uploadList = document.getElementById('recruiterUploadList');
+    const fileList = document.getElementById('recruiterFileList');
+    const dropzoneText = document.getElementById('recruiterDropzoneText');
+    const analyzeBtn = document.getElementById('recruiterAnalyzeBtn');
+    const selectedFiles = [];
+
+    function showLoadingOverlay() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+      }
+      document.body.classList.add('is-loading');
+    }
+
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+      document.body.classList.remove('is-loading');
+    }
+
+    if (!dropzone || !fileInput || !selectBtn) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, () => dropzone.classList.add('highlight'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, () => dropzone.classList.remove('highlight'), false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      handleFiles(files);
+    }, false);
+
+    selectBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', function() {
+      handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+      if (!files || files.length === 0) return;
+
+      Array.from(files).forEach(file => {
+        const entry = {
+          id: crypto.randomUUID(),
+          file,
+          text: '',
+          error: '',
+          status: 'pending'
+        };
+        selectedFiles.push(entry);
+        uploadResumeFile(entry);
+      });
+
+      renderFileList();
+    }
+
+    function renderFileList() {
+      if (selectedFiles.length === 0) {
+        uploadList.style.display = 'none';
+        dropzoneText.textContent = 'Drop files here or click to browse';
+        fileList.innerHTML = '';
+        return;
+      }
+
+      uploadList.style.display = 'block';
+      fileList.innerHTML = '';
+      dropzoneText.textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`;
+
+      selectedFiles.forEach((entry, index) => {
+        const li = document.createElement('li');
+        li.className = 'file-item';
+        li.innerHTML = `
+          <div class="file-item__header">
+            <span>${entry.file.name}</span>
+            <div class="file-item__actions">
+              ${entry.text ? `<button type="button" class="btn btn-ghost btn-file-toggle" data-index="${index}">
+                ${entry.expanded ? 'Hide text' : 'Show text'}
+              </button>` : ''}
+              <button type="button" class="btn btn-ghost btn-file-remove" data-index="${index}">Remove</button>
+            </div>
+          </div>
+          <div class="file-item__body">
+            ${entry.status === 'processing' ? '<span class="file-item__status">Extracting text...</span>' : ''}
+            ${entry.error ? `<span class="file-item__error">${entry.error}</span>` : ''}
+            ${entry.text ? `<textarea class="input-textarea file-item__textarea ${entry.expanded ? '' : 'is-collapsed'}" rows="6" readonly>${entry.text}</textarea>` : ''}
+          </div>
+        `;
+        fileList.appendChild(li);
+      });
+    }
+
+    function uploadResumeFile(entry) {
+      entry.status = 'processing';
+      renderFileList();
+
+      const formData = new FormData();
+      formData.append('file', entry.file);
+
+      fetch('/talent/api/upload/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken')
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          entry.text = data.text;
+          entry.error = '';
+          entry.status = 'complete';
+        } else {
+          entry.error = data.error || 'Upload failed';
+          entry.status = 'error';
+          showErrorModal(entry.error);
+        }
+        renderFileList();
+      })
+      .catch(error => {
+        entry.error = error.message || 'Upload failed';
+        entry.status = 'error';
+        showErrorModal(entry.error);
+        renderFileList();
+      });
+    }
+
+    fileList.addEventListener('click', (event) => {
+      const target = event.target;
+      const index = parseInt(target.getAttribute('data-index'), 10);
+      if (Number.isNaN(index)) return;
+
+      if (target.classList.contains('btn-file-remove')) {
+        selectedFiles.splice(index, 1);
+        renderFileList();
+        return;
+      }
+
+      if (target.classList.contains('btn-file-toggle')) {
+        selectedFiles[index].expanded = !selectedFiles[index].expanded;
+        renderFileList();
+      }
+    });
+
+    analyzeBtn?.addEventListener('click', () => {
+      const jdText = document.getElementById('recruiterJobDescriptionText').value.trim();
+      if (!jdText) {
+        showErrorModal('Please paste a job description before running analysis.');
+        return;
+      }
+      if (selectedFiles.length === 0) {
+        showErrorModal('Please upload at least one resume before running analysis.');
+        return;
+      }
+
+      const pending = selectedFiles.find(entry => entry.status === 'processing');
+      if (pending) {
+        showErrorModal('Please wait until all resumes finish processing.');
+        return;
+      }
+
+      const errored = selectedFiles.find(entry => entry.status === 'error');
+      if (errored) {
+        showErrorModal('One or more resumes failed to process. Please remove them and try again.');
+        return;
+      }
+
+      const missingText = selectedFiles.find(entry => !entry.text);
+      if (missingText) {
+        showErrorModal('Please ensure all resumes have extracted text.');
+        return;
+      }
+
+      showLoadingOverlay();
+      fetch('/recruiter/api/analyze/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+          job_description: jdText,
+          resumes: selectedFiles.map(entry => ({
+            id: entry.id,
+            filename: entry.file.name,
+            text: entry.text
+          }))
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        hideLoadingOverlay();
+        if (!data.success) {
+          showErrorModal(data.error || 'Analysis failed');
+          return;
+        }
+        renderResults(data.results || []);
+      })
+      .catch(error => {
+        hideLoadingOverlay();
+        showErrorModal('Analysis failed: ' + error.message);
+      });
+    });
+
+    function renderResults(results) {
+      const container = document.getElementById('recruiterResultsContainer');
+      const section = document.getElementById('recruiterAnalysisResults');
+      if (!container || !section) return;
+
+      container.innerHTML = '';
+      if (!results || results.length === 0) {
+        container.innerHTML = '<p class="result-empty">No results available.</p>';
+        section.style.display = 'block';
+        return;
+      }
+
+      results.forEach(result => {
+        const card = document.createElement('article');
+        card.className = 'analysis-card';
+
+        if (result.error) {
+          card.innerHTML = `
+            <div class="result-panel__header">
+              <span class="result-pill warning">Error</span>
+              <h6>${result.filename || 'Resume'}</h6>
+            </div>
+            <p class="result-empty">${result.error}</p>
+          `;
+          container.appendChild(card);
+          return;
+        }
+
+        const analysis = result.analysis || {};
+        const score = analysis.overall_score ?? '--';
+        const component = analysis.component_scores || {};
+        const matched = (analysis.matched_requirements || []).map(item => item.jd_text || item);
+        const missing = analysis.missing_requirements || [];
+        const concerns = analysis.concerns || [];
+        const recs = (analysis.recommendations && analysis.recommendations.recruiter) || [];
+
+        card.innerHTML = `
+          <div class="analysis-card__header">
+            <div>
+              <h5>${result.filename || 'Resume'}</h5>
+              <span class="analysis-card__meta">Evidence-backed match summary</span>
+            </div>
+            <span class="result-pill success">Score ${score}</span>
+          </div>
+          <div class="analysis-card__summary">
+            <div class="analysis-card__score">
+              <div class="score-circle">
+                <span>${score}%</span>
+              </div>
+              <div class="analysis-card__confidence">
+                Confidence: ${analysis.confidence ?? 0}%
+              </div>
+            </div>
+            <div class="analysis-card__bars">
+              <div class="score-row">
+                <div class="score-row__header">
+                  <span>Skills Match</span>
+                  <span>${component.skills_match ?? 0}</span>
+                </div>
+                <div class="score-track">
+                  <div class="score-fill" style="width: ${Math.min(100, (component.skills_match || 0) * 4)}%"></div>
+                </div>
+              </div>
+              <div class="score-row">
+                <div class="score-row__header">
+                  <span>Experience Fit</span>
+                  <span>${component.experience_fit ?? component.experience_seniority ?? 0}</span>
+                </div>
+                <div class="score-track">
+                  <div class="score-fill" style="width: ${Math.min(100, (component.experience_fit || component.experience_seniority || 0) * 5)}%"></div>
+                </div>
+              </div>
+              <div class="score-row">
+                <div class="score-row__header">
+                  <span>Education Match</span>
+                  <span>${component.education_match ?? component.education_certs ?? 0}</span>
+                </div>
+                <div class="score-track">
+                  <div class="score-fill" style="width: ${Math.min(100, (component.education_match || component.education_certs || 0) * 10)}%"></div>
+                </div>
+              </div>
+              <div class="score-row">
+                <div class="score-row__header">
+                  <span>Semantic Similarity</span>
+                  <span>${component.semantic_similarity ?? 0}</span>
+                </div>
+                <div class="score-track">
+                  <div class="score-fill" style="width: ${Math.min(100, (component.semantic_similarity || 0) * 2.5)}%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="analysis-card__details">
+            <section class="result-panel">
+              <div class="result-panel__header">
+                <span class="result-pill success">Matched</span>
+              </div>
+              <ul class="result-list">
+                ${matched.length ? matched.map(text => `<li><span>${text}</span></li>`).join('') : '<li class="result-empty">No strong matches yet.</li>'}
+              </ul>
+            </section>
+            <section class="result-panel">
+              <div class="result-panel__header">
+                <span class="result-pill warning">Missing</span>
+              </div>
+              <ul class="result-list">
+                ${missing.length ? missing.map(text => `<li><span>${text}</span></li>`).join('') : '<li class="result-empty">No critical gaps detected.</li>'}
+              </ul>
+            </section>
+            <section class="result-panel result-panel--wide">
+              <div class="result-panel__header">
+                <span class="result-pill info">Concerns</span>
+              </div>
+              <ul class="result-list">
+                ${concerns.length ? concerns.map(text => `<li><span>${text}</span></li>`).join('') : '<li class="result-empty">No concerns flagged.</li>'}
+              </ul>
+            </section>
+            <section class="result-panel result-panel--wide">
+              <div class="result-panel__header">
+                <span class="result-pill info">Recommendations</span>
+              </div>
+              <div class="result-recommendations">
+                <ul>
+                  ${recs.length ? recs.map(text => `<li>${text}</li>`).join('') : '<li class="result-empty">No recommendations available.</li>'}
+                </ul>
+              </div>
+            </section>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      section.style.display = 'block';
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+  </script>
+{% endblock %}

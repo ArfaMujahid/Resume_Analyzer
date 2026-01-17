@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Profile - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body text-center">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="{{ user.email }}" class="rounded-circle mb-3"
+                             style="width: 120px; height: 120px; object-fit: cover;">
+                    {% else %}
+                        <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3"
+                             style="width: 120px; height: 120px; font-size: 3rem;">
+                            {{ user.email.0.upper }}
+                        </div>
+                    {% endif %}
+
+                    <h5 class="card-title">{{ user.email }}</h5>
+                    <p class="text-muted">{{ user.get_role_display }}</p>
+
+                    <div class="d-flex justify-content-center gap-2">
+                        <span class="badge bg-primary">{{ user.get_plan_tier_display }} Plan</span>
+                        {% if user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-3">
+                        <a href="{% url 'users:profile_edit' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-edit me-1"></i>Edit Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Quick Links</h6>
+                    <div class="list-group list-group-flush">
+                        {% if user.is_talent %}
+                            <a href="{% url 'talent:dashboard' %}" class="list-group-item list-group-item-action">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </a>
+                            <a href="{% url 'resumes:list' %}" class="list-group-item list-group-item-action">
+                                <i class="fas fa-file me-2"></i>My Resumes
+                            </a>
+                        {% elif user.is_recruiter %}
+                            <a href="{% url 'recruiter:dashboard' %}" class="list-group-item list-group-item-action">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </a>
+                            <a href="{% url 'recruiter:batches' %}" class="list-group-item list-group-item-action">
+                                <i class="fas fa-layer-group me-2"></i>My Batches
+                            </a>
+                        {% endif %}
+                        <a href="{% url 'users:settings' %}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-cog me-2"></i>Settings
+                        </a>
+                        <a href="{% url 'users:logout' %}" class="list-group-item list-group-item-action text-danger">
+                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Email</label>
+                                <p class="mb-0">{{ user.email }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Role</label>
+                                <p class="mb-0">{{ user.get_role_display }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Plan</label>
+                                <p class="mb-0">{{ user.get_plan_tier_display }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Member Since</label>
+                                <p class="mb-0">{{ user.date_joined|date:"M d, Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="mb-3">Additional Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Location</label>
+                                <p class="mb-0">{{ profile.location|default:"Not specified" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Phone</label>
+                                <p class="mb-0">{{ user.phone|default:"Not specified" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label class="text-muted small">Bio</label>
+                                <p class="mb-0">{{ profile.bio|default:"No bio added" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Website</label>
+                                <p class="mb-0">
+                                    {% if profile.website %}
+                                        <a href="{{ profile.website }}" target="_blank" class="text-decoration-none">
+                                            {{ profile.website }}
+                                        </a>
+                                    {% else %}
+                                        Not specified
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">LinkedIn</label>
+                                <p class="mb-0">
+                                    {% if profile.linkedin_url %}
+                                        <a href="{{ profile.linkedin_url }}" target="_blank" class="text-decoration-none">
+                                            View Profile
+                                        </a>
+                                    {% else %}
+                                        Not specified
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="mb-3">Preferences</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" disabled
+                                       {% if profile.email_notifications %}checked{% endif %}>
+                                <label class="form-check-label">
+                                    Email notifications
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" disabled
+                                       {% if profile.marketing_emails %}checked{% endif %}>
+                                <label class="form-check-label">
+                                    Marketing emails
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

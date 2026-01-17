@@ -1,0 +1,738 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Batch Results - Resume Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+.batch-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+}
+
+.batch-stats {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.results-table {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.results-table table {
+    margin-bottom: 0;
+}
+
+.results-table th {
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.results-table td {
+    vertical-align: middle;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.score-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: bold;
+    min-width: 60px;
+    text-align: center;
+}
+
+.score-excellent { background: #d4edda; color: #155724; }
+.score-good { background: #cce5ff; color: #004085; }
+.score-fair { background: #fff3cd; color: #856404; }
+.score-poor { background: #f8d7da; color: #721c24; }
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.filter-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.filter-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.candidate-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.candidate-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.candidate-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.candidate-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.candidate-score {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.score-breakdown {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.breakdown-item {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 5px;
+}
+
+.breakdown-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.breakdown-value {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.evidence-preview {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #1f6b4f;
+}
+
+.evidence-preview h6 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.evidence-preview p {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin: 0;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #1f6b4f;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+body.is-loading {
+    overflow: hidden;
+}
+
+body.is-loading .site-header,
+body.is-loading .site-main,
+body.is-loading .site-footer {
+    pointer-events: none;
+}
+
+body.is-loading #loadingOverlay {
+    pointer-events: auto;
+}
+
+.progress-container {
+    margin: 2rem 0;
+}
+
+.progress-bar-container {
+    background: #e9ecef;
+    border-radius: 10px;
+    height: 20px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    background: linear-gradient(90deg, #1f6b4f, #15513b);
+    height: 100%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.875rem;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.view-toggle button {
+    padding: 0.5rem 1rem;
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #495057;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-toggle button.active {
+    background: #1f6b4f;
+    color: white;
+    border-color: #1f6b4f;
+}
+
+.view-toggle button:hover:not(.active) {
+    background: #f8f9fa;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'recruiter:dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'recruiter:batches' %}">Batches</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'recruiter:batch_detail' pk=object.pk %}">{{ object.id }}</a></li>
+            <li class="breadcrumb-item active">Results</li>
+        </ol>
+    </nav>
+
+    <!-- Batch Header -->
+    <div class="batch-header">
+        <h2 class="mb-0">Batch Results</h2>
+        <p class="mb-0 mt-2">{{ batch.job_title|default:"Untitled Batch" }}</p>
+
+        <div class="batch-stats">
+            <div class="stat-item">
+                <div class="stat-value">{{ batch.resume_count }}</div>
+                <div class="stat-label">Resumes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ results.count|default:"0" }}</div>
+                <div class="stat-label">Analyzed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ batch.job_title|default:"No JD" }}</div>
+                <div class="stat-label">Job Description</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h4>Processing resumes...</h4>
+            <p class="text-muted">Analyzing {{ batch.resume_count }} resumes against the job description.</p>
+            <div class="progress-container">
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar-fill" style="width: 0%">
+                        0%
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    {% if analysis_complete and results %}
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <h5 class="mb-3">Filter & Sort</h5>
+        <div class="filter-controls">
+            <select id="scoreFilter" class="form-control" style="width: 200px;">
+                <option value="">All Scores</option>
+                <option value="80">80% and above</option>
+                <option value="60">60% and above</option>
+                <option value="40">40% and above</option>
+                <option value="20">20% and above</option>
+            </select>
+            <select id="sortBy" class="form-control" style="width: 200px;">
+                <option value="score">Overall Score</option>
+                <option value="skills">Skills Match</option>
+                <option value="experience">Experience</option>
+                <option value="education">Education</option>
+            </select>
+            <button class="btn btn-outline-secondary" onclick="resetFilters()">
+                Reset Filters
+            </button>
+        </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="view-toggle">
+        <button id="tableViewBtn" class="active" onclick="showTableView()">
+            Table View
+        </button>
+        <button id="cardViewBtn" onclick="showCardView()">
+            Card View
+        </button>
+    </div>
+
+    <!-- Table View -->
+    <div id="tableView" class="results-table">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Resume</th>
+                    <th>Overall Score</th>
+                    <th>Skills Match</th>
+                    <th>Experience</th>
+                    <th>Education</th>
+                    <th>Confidence</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="resultsTableBody">
+                {% for result in results %}
+                <tr data-score="{{ result.overall_score }}">
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                        <strong>{{ result.resume.original_filename }}</strong>
+                        <br>
+                        <small class="text-muted">
+                            {{ result.resume.file_size_bytes|filesizeformat }} •
+                            {{ result.resume.created_at|date:"M d, Y" }}
+                        </small>
+                    </td>
+                    <td>
+                        <span class="score-badge {% if result.overall_score >= 80 %}score-excellent{% elif result.overall_score >= 60 %}score-good{% elif result.overall_score >= 40 %}score-fair{% else %}score-poor{% endif %}">
+                            {{ result.overall_score|floatformat:0 }}%
+                        </span>
+                    </td>
+                    <td>{{ result.component_scores.skills_match|floatformat:1 }}/25</td>
+                    <td>{{ result.component_scores.experience_seniority|floatformat:1 }}/20</td>
+                    <td>{{ result.component_scores.education_certs|floatformat:1 }}/10</td>
+                    <td>{{ result.confidence|floatformat:0 }}%</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewDetails({{ result.id }})">
+                                View
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="shortlist({{ result.id }})">
+                                Shortlist
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Card View -->
+    <div id="cardView" style="display: none;">
+        <div id="resultsCardContainer">
+            {% for result in results %}
+            <div class="candidate-card" data-score="{{ result.overall_score }}">
+                <div class="candidate-header">
+                    <div>
+                        <div class="candidate-name">{{ result.resume.original_filename }}</div>
+                        <small class="text-muted">
+                            {{ result.resume.created_at|date:"M d, Y" }} •
+                            {{ result.resume.file_size_bytes|filesizeformat }}
+                        </small>
+                    </div>
+                    <div class="candidate-score score-badge {% if result.overall_score >= 80 %}score-excellent{% elif result.overall_score >= 60 %}score-good{% elif result.overall_score >= 40 %}score-fair{% else %}score-poor{% endif %}">
+                        {{ result.overall_score|floatformat:0 }}%
+                    </div>
+                </div>
+
+                <div class="score-breakdown">
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Skills</div>
+                        <div class="breakdown-value">{{ result.component_scores.skills_match|floatformat:0 }}/25</div>
+                    </div>
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Experience</div>
+                        <div class="breakdown-value">{{ result.component_scores.experience_seniority|floatformat:0 }}/20</div>
+                    </div>
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Education</div>
+                        <div class="breakdown-value">{{ result.component_scores.education_certs|floatformat:0 }}/10</div>
+                    </div>
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">Confidence</div>
+                        <div class="breakdown-value">{{ result.confidence|floatformat:0 }}%</div>
+                    </div>
+                </div>
+
+                {% if result.evidence.matchedRequirements %}
+                <div class="evidence-preview">
+                    <h6>Top Matches</h6>
+                    {% for match in result.evidence.matchedRequirements|slice:":2" %}
+                    <p>{{ match.jd_text }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="action-buttons mt-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewDetails({{ result.id }})">
+                        View Details
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="shortlist({{ result.id }})">
+                        Shortlist
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="downloadResume({{ result.resume.id }})">
+                        Download
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No Results Yet -->
+    <div class="text-center py-5">
+        <h3>No Analysis Results</h3>
+        <p class="text-muted">
+            {% if batch.status == 'processing' %}
+                The batch is currently being processed. Please wait...
+            {% elif not batch.job_title %}
+                Please set a job description before running the analysis.
+            {% elif not batch.resume_count %}
+                No resumes in this batch. Upload resumes first.
+            {% else %}
+                Click "Start Ranking" to analyze the resumes in this batch.
+            {% endif %}
+        </p>
+        {% if batch.job_title and batch.resume_count and batch.status != 'processing' %}
+        <form method="post" class="d-inline" id="startRankingForm">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-lg">
+                Start Ranking
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{% url 'recruiter:batch_detail' pk=object.pk %}" class="btn btn-secondary btn-lg mr-2">
+                ← Back to Batch
+            </a>
+            {% if analysis_complete %}
+            <a href="{% url 'recruiter:batch_export' pk=object.pk %}" class="btn btn-success btn-lg">
+                Export CSV →
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Candidate Details Modal -->
+<div class="modal fade" id="candidateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Candidate Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="candidateModalBody">
+                <!-- Content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" onclick="shortlistFromModal()">Shortlist</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentResultId = null;
+
+function showLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
+    document.body.classList.add('is-loading');
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+    document.body.classList.remove('is-loading');
+}
+
+// Check ranking status periodically
+function checkRankingStatus() {
+    const batchId = {{ object.pk }};
+
+    fetch(`/recruiter/api/batch/${batchId}/status/`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'completed') {
+            // Reload the page to show results
+            window.location.reload();
+        } else if (data.status === 'failed') {
+            // Hide loading and show error
+            hideLoadingOverlay();
+            const loadingContent = document.querySelector('.loading-content h4');
+            loadingContent.textContent = 'Processing Failed';
+            loadingContent.nextElementSibling.textContent = data.error || 'An error occurred during processing.';
+        } else if (data.status === 'processing') {
+            // Update progress with real data
+            updateProgress(data.progress || 0);
+
+            // Update status message
+            const statusMessage = document.querySelector('.loading-content p');
+            if (statusMessage) {
+                statusMessage.textContent = data.message || `Processing ${data.processed || 0} of ${data.total || 0} resumes...`;
+            }
+
+            // Show current processing item if available
+            if (data.current_item) {
+                const currentProcessing = document.createElement('div');
+                currentProcessing.className = 'mt-3 text-muted';
+                currentProcessing.innerHTML = `<small>Currently: ${data.current_item}</small>`;
+                const loadingContent = document.querySelector('.loading-content');
+                // Remove previous current item if exists
+                const prevCurrent = loadingContent.querySelector('.mt-3');
+                if (prevCurrent) prevCurrent.remove();
+                loadingContent.appendChild(currentProcessing);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error checking status:', error);
+        // Continue checking even on error
+    });
+}
+
+// Update progress bar
+function updateProgress(percent) {
+    const progressBar = document.getElementById('progressBar');
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+    }
+}
+
+// Show loading overlay if ranking is running
+{% if batch.status == 'processing' %}
+showLoadingOverlay();
+let progress = 0;
+// Check status every 3 seconds
+setInterval(checkRankingStatus, 3000);
+{% endif %}
+
+document.getElementById('startRankingForm')?.addEventListener('submit', () => {
+    showLoadingOverlay();
+});
+
+// View toggle functions
+function showTableView() {
+    document.getElementById('tableView').style.display = 'block';
+    document.getElementById('cardView').style.display = 'none';
+    document.getElementById('tableViewBtn').classList.add('active');
+    document.getElementById('cardViewBtn').classList.remove('active');
+}
+
+function showCardView() {
+    document.getElementById('tableView').style.display = 'none';
+    document.getElementById('cardView').style.display = 'block';
+    document.getElementById('tableViewBtn').classList.remove('active');
+    document.getElementById('cardViewBtn').classList.add('active');
+}
+
+// Filter functions
+function applyFilters() {
+    const scoreFilter = document.getElementById('scoreFilter').value;
+    const sortBy = document.getElementById('sortBy').value;
+
+    // Get all result elements
+    const tableRows = document.querySelectorAll('#resultsTableBody tr');
+    const cards = document.querySelectorAll('.candidate-card');
+
+    // Apply score filter
+    [...tableRows, ...cards].forEach(element => {
+        const score = parseFloat(element.dataset.score);
+        if (scoreFilter && score < parseFloat(scoreFilter)) {
+            element.style.display = 'none';
+        } else {
+            element.style.display = '';
+        }
+    });
+
+    // Apply sorting (simplified - would need backend sorting for proper implementation)
+    if (sortBy !== 'score') {
+        console.log('Sorting by', sortBy, '- would need backend implementation');
+    }
+}
+
+function resetFilters() {
+    document.getElementById('scoreFilter').value = '';
+    document.getElementById('sortBy').value = 'score';
+    applyFilters();
+}
+
+// Add event listeners for filters
+document.getElementById('scoreFilter')?.addEventListener('change', applyFilters);
+document.getElementById('sortBy')?.addEventListener('change', applyFilters);
+
+// Action functions
+function viewDetails(resultId) {
+    currentResultId = resultId;
+    // Load candidate details into modal
+    fetch(`/api/candidate/${resultId}/`)
+        .then(response => response.json())
+        .then(data => {
+            const modalBody = document.getElementById('candidateModalBody');
+            modalBody.innerHTML = `
+                <h5>${data.filename}</h5>
+                <div class="mb-3">
+                    <strong>Overall Score:</strong> ${data.overall_score}%
+                </div>
+                <div class="mb-3">
+                    <h6>Score Breakdown:</h6>
+                    <ul>
+                        <li>Skills Match: ${data.skills_match}/25</li>
+                        <li>Experience: ${data.experience}/20</li>
+                        <li>Education: ${data.education}/10</li>
+                    </ul>
+                </div>
+                <div class="mb-3">
+                    <h6>Matched Requirements:</h6>
+                    ${data.matched_requirements.map(req => `<p>• ${req}</p>`).join('')}
+                </div>
+            `;
+            new bootstrap.Modal(document.getElementById('candidateModal')).show();
+        })
+        .catch(error => {
+            console.error('Error loading candidate details:', error);
+            showErrorModal('Error loading candidate details.');
+        });
+}
+
+function shortlist(resultId) {
+    // Implement shortlist functionality
+    fetch(`/api/shortlist/${resultId}/`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Candidate shortlisted successfully!');
+            } else {
+                showErrorModal('Error shortlisting candidate.');
+            }
+        })
+        .catch(error => {
+            console.error('Error shortlisting:', error);
+            showErrorModal('Error shortlisting candidate.');
+        });
+}
+
+function shortlistFromModal() {
+    if (currentResultId) {
+        shortlist(currentResultId);
+        bootstrap.Modal.getInstance(document.getElementById('candidateModal')).hide();
+    }
+}
+
+function downloadResume(resumeId) {
+    window.open(`/resumes/${resumeId}/download/`, '_blank');
+}
+</script>
+{% endblock %}

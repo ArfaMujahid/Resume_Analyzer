@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+
+{% block title %}Talent Dashboard{% endblock %}
+
+{% block body_class %}page-dashboard{% endblock %}
+
+{% block content %}
+  <section class="page-header fade-up">
+    <div>
+      <span class="tag">Talent workspace</span>
+      <h1>Resume Analyzer</h1>
+      <p>Analyze your resume against job descriptions using AI</p>
+    </div>
+    <div class="header-actions">
+    </div>
+  </section>
+
+  <section class="grid two-col fade-up delay-1">
+    <article class="card">
+      <h3>Upload a resume</h3>
+      <p>PDF, DOCX, or TXT. We extract text and structure automatically.</p>
+      <div class="dropzone" id="resumeDropzone">
+        <input type="file" id="resumeFileInput" accept=".pdf,.docx,.txt" style="display: none;">
+        <span id="dropzoneText">Drop files here or click to browse</span>
+        <button class="btn btn-ghost" onclick="document.getElementById('resumeFileInput').click()">Select file</button>
+      </div>
+      <div id="uploadResult" style="margin-top: 1rem; display: none;">
+        <div class="alert alert-success">
+          <strong>Success!</strong> Resume uploaded and processed.
+        </div>
+        <textarea id="extractedResumeText" class="input-textarea" rows="8" placeholder="Your resume text will appear here..." style="margin-top: 1rem;"></textarea>
+      </div>
+    </article>
+    <article class="card">
+      <h3>Job Description</h3>
+      <p>Paste the job description you want to analyze against</p>
+      <textarea id="jobDescriptionText" class="input-textarea" rows="8" placeholder="Paste job description text..."></textarea>
+      <button class="btn btn-mint" onclick="analyzeResume()" style="margin-top: 1rem;">Analyze Match</button>
+    </article>
+  </section>
+
+  <section class="section fade-up delay-2" id="analysisResults" style="display: none;">
+    <div class="section-heading">
+      <h2>Analysis Results</h2>
+      <p>Review your match score and recommendations</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="score-circle">
+              <span id="overallScore">--</span>
+            </div>
+            <p class="text-center">Overall Score</p>
+          </div>
+          <div class="col-md-9">
+            <h5>Component Scores</h5>
+            <div class="score-row">
+              <div class="score-row__header">
+                <span>Skills Match</span>
+                <span id="skillsScore">--</span>
+              </div>
+              <div class="score-track">
+                <div class="score-fill" id="skillsProgress"></div>
+              </div>
+            </div>
+            <div class="score-row">
+              <div class="score-row__header">
+                <span>Experience Fit</span>
+                <span id="experienceScore">--</span>
+              </div>
+              <div class="score-track">
+                <div class="score-fill" id="experienceProgress"></div>
+              </div>
+            </div>
+            <div class="score-row">
+              <div class="score-row__header">
+                <span>Education Match</span>
+                <span id="educationScore">--</span>
+              </div>
+              <div class="score-track">
+                <div class="score-fill" id="educationProgress"></div>
+              </div>
+            </div>
+            <div class="score-row">
+              <div class="score-row__header">
+                <span>Semantic Similarity</span>
+                <span id="semanticScore">--</span>
+              </div>
+              <div class="score-track">
+                <div class="score-fill" id="semanticProgress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <section class="result-panel">
+            <div class="result-panel__header">
+              <span class="result-pill success">Matched</span>
+              <h6>Matched Requirements</h6>
+            </div>
+            <ul id="matchedRequirements" class="result-list"></ul>
+          </section>
+          <section class="result-panel">
+            <div class="result-panel__header">
+              <span class="result-pill warning">Missing</span>
+              <h6>Missing Requirements</h6>
+            </div>
+            <ul id="missingRequirements" class="result-list"></ul>
+          </section>
+        </div>
+
+        <section class="result-panel result-panel--wide">
+          <div class="result-panel__header">
+            <span class="result-pill info">Next Steps</span>
+            <h6>Recommendations</h6>
+          </div>
+          <div id="recommendations" class="result-recommendations"></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <h4>Analyzing your resume...</h4>
+      <p class="text-muted">This may take a few moments. Please wait.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showLoadingOverlay() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+  }
+  document.body.classList.add('is-loading');
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+  document.body.classList.remove('is-loading');
+}
+
+// File upload handling
+const dropzone = document.getElementById('resumeDropzone');
+const fileInput = document.getElementById('resumeFileInput');
+const uploadResult = document.getElementById('uploadResult');
+const extractedText = document.getElementById('extractedResumeText');
+
+// Prevent default drag behaviors
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  dropzone.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+// Highlight drop zone when item is dragged over it
+['dragenter', 'dragover'].forEach(eventName => {
+  dropzone.addEventListener(eventName, highlight, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  dropzone.addEventListener(eventName, unhighlight, false);
+});
+
+function highlight(e) {
+  dropzone.classList.add('highlight');
+}
+
+function unhighlight(e) {
+  dropzone.classList.remove('highlight');
+}
+
+// Handle dropped files
+dropzone.addEventListener('drop', handleDrop, false);
+
+function handleDrop(e) {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  handleFiles(files);
+}
+
+fileInput.addEventListener('change', function(e) {
+  handleFiles(this.files);
+});
+
+function handleFiles(files) {
+  if (files.length > 0) {
+    const file = files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Show loading state
+    document.getElementById('dropzoneText').textContent = 'Processing...';
+    uploadResult.style.display = 'block';
+    extractedText.value = 'Processing file...';
+
+    // Upload file to server for processing
+    fetch('/talent/api/upload/', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        extractedText.value = data.text;
+        document.getElementById('dropzoneText').textContent = data.filename;
+      } else {
+        extractedText.value = 'Error: ' + data.error;
+        document.getElementById('dropzoneText').textContent = 'Upload failed';
+      }
+    })
+    .catch(error => {
+      extractedText.value = 'Error: ' + error.message;
+      document.getElementById('dropzoneText').textContent = 'Upload failed';
+    });
+  }
+}
+
+// Analysis function
+async function analyzeResume() {
+  const resumeText = extractedText.value;
+  const jobDescription = document.getElementById('jobDescriptionText').value;
+
+  if (!resumeText || !jobDescription) {
+    showErrorModal('Please upload your resume and provide a job description.');
+    return;
+  }
+
+  try {
+    showLoadingOverlay();
+    const response = await fetch('/talent/api/analyze/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({
+        resume_text: resumeText,
+        job_description: jobDescription
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      displayResults(data);
+    } else {
+      showErrorModal('Analysis failed: ' + data.error);
+      document.getElementById('analysisResults').style.display = 'none';
+    }
+  } catch (error) {
+    showErrorModal('Analysis failed: ' + error.message);
+    // Hide results section on error
+    document.getElementById('analysisResults').style.display = 'none';
+  } finally {
+    hideLoadingOverlay();
+  }
+}
+
+function displayResults(data) {
+  // Show results section
+  document.getElementById('analysisResults').style.display = 'block';
+
+  // Update overall score
+  document.getElementById('overallScore').textContent = data.overall_score;
+
+  // Update component scores
+  const componentScores = data.component_scores;
+  document.getElementById('skillsScore').textContent = componentScores.skills_match || 0;
+  document.getElementById('experienceScore').textContent = componentScores.experience_fit || 0;
+  document.getElementById('educationScore').textContent = componentScores.education_match || 0;
+  document.getElementById('semanticScore').textContent = componentScores.semantic_similarity || 0;
+
+  // Update progress bars
+  document.getElementById('skillsProgress').style.width = Math.min(100, (componentScores.skills_match || 0) * 4) + '%';
+  document.getElementById('experienceProgress').style.width = Math.min(100, (componentScores.experience_fit || 0) * 5) + '%';
+  document.getElementById('educationProgress').style.width = Math.min(100, (componentScores.education_match || 0) * 10) + '%';
+  document.getElementById('semanticProgress').style.width = Math.min(100, (componentScores.semantic_similarity || 0) * 2.5) + '%';
+
+  // Update matched requirements
+  const matchedList = document.getElementById('matchedRequirements');
+  matchedList.innerHTML = '';
+  if (data.matched_requirements && data.matched_requirements.length > 0) {
+    data.matched_requirements.forEach(req => {
+      const li = document.createElement('li');
+      const text = req.jd_text || req;
+      li.innerHTML = `<span>${text}</span>`;
+      matchedList.appendChild(li);
+    });
+  } else {
+    matchedList.innerHTML = '<li class="result-empty">No strong matches yet.</li>';
+  }
+
+  // Update missing requirements
+  const missingList = document.getElementById('missingRequirements');
+  missingList.innerHTML = '';
+  if (data.missing_requirements && data.missing_requirements.length > 0) {
+    data.missing_requirements.forEach(req => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${req}</span>`;
+      missingList.appendChild(li);
+    });
+  } else {
+    missingList.innerHTML = '<li class="result-empty">No critical gaps detected.</li>';
+  }
+
+  // Update recommendations
+  const recommendationsDiv = document.getElementById('recommendations');
+  recommendationsDiv.innerHTML = '';
+
+  if (data.recommendations.talent && data.recommendations.talent.length > 0) {
+    const talentRecs = document.createElement('div');
+    talentRecs.innerHTML = '<ul>' +
+      data.recommendations.talent.map(rec => `<li>${rec}</li>`).join('') +
+      '</ul>';
+    recommendationsDiv.appendChild(talentRecs);
+  } else {
+    recommendationsDiv.innerHTML = '<p class="result-empty">No recommendations available.</p>';
+  }
+
+  // Scroll to results
+  document.getElementById('analysisResults').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Helper function to get CSRF token
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>
+
+<style>
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #1f6b4f;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+body.is-loading {
+  overflow: hidden;
+}
+
+body.is-loading .site-header,
+body.is-loading .site-main,
+body.is-loading .site-footer {
+  pointer-events: none;
+}
+
+body.is-loading #loadingOverlay {
+  pointer-events: auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.dropzone {
+  border: 2px dashed #ccc;
+  border-radius: 4px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.dropzone:hover,
+.dropzone.highlight {
+  border-color: #1f6b4f;
+}
+
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: conic-gradient(from 120deg, #1f6b4f, #3f8f7a, #d7ecf6);
+  color: #0c1b22;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 auto;
+  position: relative;
+}
+
+.score-circle::after {
+  content: '';
+  position: absolute;
+  width: 88px;
+  height: 88px;
+  background: #fffdf9;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(12, 27, 34, 0.08);
+}
+
+.score-circle span {
+  position: relative;
+  z-index: 1;
+}
+
+.score-row {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(12, 27, 34, 0.08);
+  margin-bottom: 12px;
+}
+
+.score-row__header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.score-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(12, 27, 34, 0.08);
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1f6b4f, #3f8f7a);
+  transition: width 0.4s ease;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.result-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 18px;
+  padding: 18px;
+  border: 1px solid rgba(12, 27, 34, 0.08);
+  box-shadow: 0 16px 40px rgba(12, 27, 34, 0.06);
+}
+
+.result-panel--wide {
+  margin-top: 18px;
+}
+
+.result-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.result-panel__header h6 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.result-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.result-pill.success {
+  background: rgba(47, 143, 131, 0.16);
+  color: #1f6f66;
+}
+
+.result-pill.warning {
+  background: rgba(255, 171, 0, 0.16);
+  color: #9a5a00;
+}
+
+.result-pill.info {
+  background: rgba(12, 27, 34, 0.08);
+  color: #2b3a40;
+}
+
+.result-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.result-list li {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(12, 27, 34, 0.06);
+  line-height: 1.5;
+}
+
+.result-recommendations ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.result-recommendations li {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(12, 27, 34, 0.06);
+  line-height: 1.55;
+}
+
+.result-empty {
+  color: rgba(12, 27, 34, 0.6);
+  font-style: italic;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px dashed rgba(12, 27, 34, 0.12);
+}
+</style>
+{% endblock %}

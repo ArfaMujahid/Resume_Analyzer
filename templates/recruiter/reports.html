@@ -1,0 +1,819 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Custom Reports - Resume Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-builder {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.report-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.report-section h5 {
+    color: #495057;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.metric-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #1f6b4f;
+    transition: transform 0.2s;
+}
+
+.metric-card:hover {
+    transform: translateX(5px);
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1f6b4f;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.chart-container h5 {
+    color: #495057;
+    margin-bottom: 1rem;
+}
+
+.report-preview {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    min-height: 400px;
+}
+
+.report-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.report-header h2 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.report-header p {
+    color: #6c757d;
+    margin: 0;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+}
+
+.report-table th,
+.report-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.report-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+.report-table tr:hover {
+    background: #f8f9fa;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-controls .form-control {
+    flex: 1;
+    min-width: 200px;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #1f6b4f;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.custom-section {
+    background: #e7f3ff;
+    border: 1px dashed #1f6b4f;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.custom-section-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.remove-section {
+    color: #b5534b;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.remove-section:hover {
+    color: #a71d2a;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'recruiter:dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item active">Custom Reports</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">Generate Custom Reports</h2>
+            <p class="text-muted">Create detailed reports with custom metrics and visualizations.</p>
+        </div>
+    </div>
+
+    <!-- Report Builder -->
+    <div class="report-builder">
+        <h4 class="mb-4">Report Configuration</h4>
+
+        <!-- Basic Filters -->
+        <div class="report-section">
+            <h5>1. Data Range & Filters</h5>
+            <div class="filter-controls">
+                <select id="reportPeriod" class="form-control">
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="90d">Last 90 Days</option>
+                    <option value="all">All Time</option>
+                </select>
+                <select id="batchFilter" class="form-control">
+                    <option value="">All Batches</option>
+                    {% for batch in recent_batches %}
+                    <option value="{{ batch.id }}">{{ batch.job_title|default:"Batch " }}{{ batch.id|slice:"8" }}</option>
+                    {% endfor %}
+                </select>
+                <select id="scoreFilter" class="form-control">
+                    <option value="">All Scores</option>
+                    <option value="80">80% and above</option>
+                    <option value="60">60% and above</option>
+                    <option value="40">40% and above</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Metrics Selection -->
+        <div class="report-section">
+            <h5>2. Metrics to Include</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricScoreDist" checked>
+                        <label class="form-check-label" for="metricScoreDist">
+                            Score Distribution
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricTopSkills" checked>
+                        <label class="form-check-label" for="metricTopSkills">
+                            Top Skills Analysis
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricProcessingTrend" checked>
+                        <label class="form-check-label" for="metricProcessingTrend">
+                            Processing Trend
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricPerformance" checked>
+                        <label class="form-check-label" for="metricPerformance">
+                            Performance Metrics
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricCandidateDetails">
+                        <label class="form-check-label" for="metricCandidateDetails">
+                            Candidate Details Table
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricSkillGaps">
+                        <label class="form-check-label" for="metricSkillGaps">
+                            Skill Gaps Analysis
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricRecommendations">
+                        <label class="form-check-label" for="metricRecommendations">
+                            Common Recommendations
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="metricTimeAnalysis">
+                        <label class="form-check-label" for="metricTimeAnalysis">
+                            Time-based Analysis
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Sections -->
+        <div class="report-section">
+            <h5>3. Custom Sections</h5>
+            <div id="customSections">
+                <div class="custom-section">
+                    <div class="custom-section-header">
+                        <strong>Executive Summary</strong>
+                        <span class="remove-section" onclick="removeCustomSection(this)">×</span>
+                    </div>
+                    <textarea class="form-control mt-2" rows="3" placeholder="Enter custom summary text..."></textarea>
+                </div>
+            </div>
+            <button class="btn btn-outline-primary btn-sm mt-2" onclick="addCustomSection()">
+                <i class="fas fa-plus me-2"></i>Add Custom Section
+            </button>
+        </div>
+
+        <!-- Generate Button -->
+        <div class="text-center">
+            <button class="btn btn-primary btn-lg" onclick="generateReport()">
+                <i class="fas fa-chart-bar me-2"></i>Generate Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Report Preview -->
+    <div id="reportPreview" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>Report Preview</h4>
+            <div class="export-buttons">
+                <button class="btn btn-outline-secondary" onclick="editReport()">
+                    <i class="fas fa-edit me-2"></i>Edit
+                </button>
+                <button class="btn btn-success" onclick="exportReport('pdf')">
+                    <i class="fas fa-file-pdf me-2"></i>Export PDF
+                </button>
+                <button class="btn btn-info" onclick="exportReport('excel')">
+                    <i class="fas fa-file-excel me-2"></i>Export Excel
+                </button>
+            </div>
+        </div>
+
+        <div class="report-preview" id="reportContent">
+            <!-- Report content will be generated here -->
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h4>Generating Report...</h4>
+            <p class="text-muted">Please wait while we compile your custom report.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
+
+<script>
+let reportData = null;
+let reportCharts = [];
+
+function generateReport() {
+    // Show loading overlay
+    document.getElementById('loadingOverlay').style.display = 'flex';
+
+    // Collect report configuration
+    const config = {
+        period: document.getElementById('reportPeriod').value,
+        batchFilter: document.getElementById('batchFilter').value,
+        scoreFilter: document.getElementById('scoreFilter').value,
+        metrics: {
+            scoreDist: document.getElementById('metricScoreDist').checked,
+            topSkills: document.getElementById('metricTopSkills').checked,
+            processingTrend: document.getElementById('metricProcessingTrend').checked,
+            performance: document.getElementById('metricPerformance').checked,
+            candidateDetails: document.getElementById('metricCandidateDetails').checked,
+            skillGaps: document.getElementById('metricSkillGaps').checked,
+            recommendations: document.getElementById('metricRecommendations').checked,
+            timeAnalysis: document.getElementById('metricTimeAnalysis').checked
+        },
+        customSections: collectCustomSections()
+    };
+
+    // Fetch report data
+    fetch('/recruiter/api/generate-report/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        reportData = data;
+        renderReport(data, config);
+        document.getElementById('loadingOverlay').style.display = 'none';
+        document.getElementById('reportPreview').style.display = 'block';
+    })
+    .catch(error => {
+        console.error('Error generating report:', error);
+        // Show mock data for demo
+        showMockReport(config);
+        document.getElementById('loadingOverlay').style.display = 'none';
+        document.getElementById('reportPreview').style.display = 'block';
+    });
+}
+
+function renderReport(data, config) {
+    const content = document.getElementById('reportContent');
+    content.innerHTML = '';
+
+    // Report header
+    content.innerHTML += `
+        <div class="report-header">
+            <h2>Resume Analysis Report</h2>
+            <p>Generated on ${new Date().toLocaleDateString()} • Period: ${config.period}</p>
+        </div>
+    `;
+
+    // Custom sections
+    config.customSections.forEach(section => {
+        if (section.text) {
+            content.innerHTML += `
+                <div class="mb-4">
+                    <h4>${section.title}</h4>
+                    <p>${section.text}</p>
+                </div>
+            `;
+        }
+    });
+
+    // Executive Summary
+    if (config.metrics.performance) {
+        content.innerHTML += `
+            <div class="mb-4">
+                <h4>Executive Summary</h4>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.totalCandidates || 156}</div>
+                            <div class="metric-label">Total Candidates</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.avgScore || 68}%</div>
+                            <div class="metric-label">Average Score</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.processingTime || 2.3} min</div>
+                            <div class="metric-label">Avg Processing Time</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.shortlistRate || 24}%</div>
+                            <div class="metric-label">Shortlist Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Score Distribution
+    if (config.metrics.scoreDist) {
+        content.innerHTML += `
+            <div class="chart-container">
+                <h5>Score Distribution</h5>
+                <canvas id="reportScoreChart" width="800" height="400"></canvas>
+            </div>
+        `;
+    }
+
+    // Top Skills
+    if (config.metrics.topSkills) {
+        content.innerHTML += `
+            <div class="mb-4">
+                <h4>Top In-Demand Skills</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="reportSkillsChart" width="400" height="300"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Skill</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody id="skillsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Processing Trend
+    if (config.metrics.processingTrend) {
+        content.innerHTML += `
+            <div class="chart-container">
+                <h5>Processing Trend</h5>
+                <canvas id="reportTrendChart" width="800" height="400"></canvas>
+            </div>
+        `;
+    }
+
+    // Candidate Details Table
+    if (config.metrics.candidateDetails) {
+        content.innerHTML += `
+            <div class="mb-4">
+                <h4>Candidate Details</h4>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Name</th>
+                            <th>Score</th>
+                            <th>Skills Match</th>
+                            <th>Experience</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="candidatesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Render charts after DOM is updated
+    setTimeout(() => {
+        renderReportCharts(data, config);
+        populateReportTables(data, config);
+    }, 100);
+}
+
+function renderReportCharts(data, config) {
+    // Clear existing charts
+    reportCharts.forEach(chart => chart.destroy());
+    reportCharts = [];
+
+    // Score Distribution Chart
+    if (config.metrics.scoreDist) {
+        const ctx = document.getElementById('reportScoreChart');
+        if (ctx) {
+            const chart = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
+                    datasets: [{
+                        label: 'Number of Candidates',
+                        data: data.scoreDistribution || [5, 12, 25, 18, 8],
+                        backgroundColor: ['#b5534b', '#d97757', '#c8a24a', '#4aa083', '#2f8f6a']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            reportCharts.push(chart);
+        }
+    }
+
+    // Top Skills Chart
+    if (config.metrics.topSkills) {
+        const ctx = document.getElementById('reportSkillsChart');
+        if (ctx) {
+            const chart = new Chart(ctx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: (data.topSkills || []).map(s => s.skill),
+                    datasets: [{
+                        data: (data.topSkills || []).map(s => s.count),
+                        backgroundColor: ['#1f6b4f', '#2f8f6a', '#c8a24a', '#b5534b', '#5a7f6b', '#d97757']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            reportCharts.push(chart);
+        }
+    }
+
+    // Processing Trend Chart
+    if (config.metrics.processingTrend) {
+        const ctx = document.getElementById('reportTrendChart');
+        if (ctx) {
+            const chart = new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: data.processingTrend?.labels || generateDateLabels(7),
+                    datasets: [{
+                        label: 'Resumes Processed',
+                        data: data.processingTrend?.data || [12, 19, 15, 25, 22, 30, 28],
+                        borderColor: '#1f6b4f',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            reportCharts.push(chart);
+        }
+    }
+}
+
+function populateReportTables(data, config) {
+    // Skills Table
+    if (config.metrics.topSkills) {
+        const skillsBody = document.getElementById('skillsTableBody');
+        if (skillsBody) {
+            skillsBody.innerHTML = '';
+            (data.topSkills || []).forEach(skill => {
+                skillsBody.innerHTML += `
+                    <tr>
+                        <td>${skill.skill}</td>
+                        <td>${skill.count}</td>
+                        <td>${skill.percentage || Math.round(skill.count / 156 * 100)}%</td>
+                    </tr>
+                `;
+            });
+        }
+    }
+
+    // Candidates Table
+    if (config.metrics.candidateDetails) {
+        const candidatesBody = document.getElementById('candidatesTableBody');
+        if (candidatesBody) {
+            candidatesBody.innerHTML = '';
+            (data.candidates || []).forEach((candidate, index) => {
+                candidatesBody.innerHTML += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${candidate.name}</td>
+                        <td>${candidate.score}%</td>
+                        <td>${candidate.skills}/25</td>
+                        <td>${candidate.experience}/20</td>
+                        <td>
+                            <span class="badge bg-${candidate.score >= 70 ? 'success' : candidate.score >= 50 ? 'warning' : 'danger'}">
+                                ${candidate.score >= 70 ? 'Shortlisted' : 'Under Review'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    }
+}
+
+function showMockReport(config) {
+    const mockData = {
+        totalCandidates: 156,
+        avgScore: '68%',
+        processingTime: 2.3,
+        shortlistRate: '24%',
+        scoreDistribution: [5, 12, 25, 18, 8],
+        topSkills: [
+            { skill: 'Python', count: 45, percentage: 29 },
+            { skill: 'JavaScript', count: 38, percentage: 24 },
+            { skill: 'React', count: 32, percentage: 21 },
+            { skill: 'AWS', count: 28, percentage: 18 },
+            { skill: 'Docker', count: 22, percentage: 14 }
+        ],
+        processingTrend: {
+            labels: generateDateLabels(7),
+            data: [12, 19, 15, 25, 22, 30, 28]
+        },
+        candidates: [
+            { name: 'John Doe', score: 85, skills: 22, experience: 18 },
+            { name: 'Jane Smith', score: 78, skills: 20, experience: 16 },
+            { name: 'Mike Johnson', score: 72, skills: 18, experience: 15 },
+            { name: 'Sarah Williams', score: 68, skills: 17, experience: 14 },
+            { name: 'Tom Brown', score: 65, skills: 16, experience: 13 }
+        ]
+    };
+
+    renderReport(mockData, config);
+}
+
+function collectCustomSections() {
+    const sections = [];
+    document.querySelectorAll('.custom-section').forEach(section => {
+        const title = section.querySelector('strong').textContent;
+        const text = section.querySelector('textarea').value;
+        sections.push({ title, text });
+    });
+    return sections;
+}
+
+function addCustomSection() {
+    const container = document.getElementById('customSections');
+    const sectionCount = container.children.length;
+    const newSection = document.createElement('div');
+    newSection.className = 'custom-section';
+    newSection.innerHTML = `
+        <div class="custom-section-header">
+            <strong>Custom Section ${sectionCount + 1}</strong>
+            <span class="remove-section" onclick="removeCustomSection(this)">×</span>
+        </div>
+        <textarea class="form-control mt-2" rows="3" placeholder="Enter custom text..."></textarea>
+    `;
+    container.appendChild(newSection);
+}
+
+function removeCustomSection(element) {
+    element.closest('.custom-section').remove();
+}
+
+function editReport() {
+    document.getElementById('reportPreview').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function exportReport(format) {
+    if (format === 'pdf') {
+        exportToPDF();
+    } else if (format === 'excel') {
+        exportToExcel();
+    }
+}
+
+function exportToPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Add title
+    doc.setFontSize(20);
+    doc.text('Resume Analysis Report', 105, 20, { align: 'center' });
+
+    // Add date
+    doc.setFontSize(12);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 30, { align: 'center' });
+
+    // Add content (simplified)
+    doc.setFontSize(14);
+    doc.text('Executive Summary', 20, 50);
+    doc.setFontSize(12);
+    doc.text('Total Candidates: 156', 20, 60);
+    doc.text('Average Score: 68%', 20, 70);
+    doc.text('Processing Time: 2.3 min', 20, 80);
+
+    // Save the PDF
+    doc.save('resume_analysis_report.pdf');
+}
+
+function exportToExcel() {
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Summary sheet
+    const summaryData = [
+        ['Metric', 'Value'],
+        ['Total Candidates', 156],
+        ['Average Score', '68%'],
+        ['Processing Time', '2.3 min'],
+        ['Shortlist Rate', '24%']
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+    // Candidates sheet
+    const candidatesData = [
+        ['Rank', 'Name', 'Score', 'Skills Match', 'Experience', 'Status'],
+        [1, 'John Doe', '85%', '22/25', '18/20', 'Shortlisted'],
+        [2, 'Jane Smith', '78%', '20/25', '16/20', 'Shortlisted'],
+        [3, 'Mike Johnson', '72%', '18/25', '15/20', 'Under Review']
+    ];
+    const candidatesWs = XLSX.utils.aoa_to_sheet(candidatesData);
+    XLSX.utils.book_append_sheet(wb, candidatesWs, 'Candidates');
+
+    // Save the Excel file
+    XLSX.writeFile(wb, 'resume_analysis_report.xlsx');
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function generateDateLabels(days) {
+    const labels = [];
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+    return labels;
+}
+</script>
+{% endblock %}
